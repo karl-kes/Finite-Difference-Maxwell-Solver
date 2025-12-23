@@ -6,6 +6,7 @@
 #include <omp.h>
 #include <cassert>
 #include <cctype>
+#include <chrono>
 
 class Grid {
 private:
@@ -50,7 +51,8 @@ public:
         #pragma omp parallel for collapse(2)
         for ( std::size_t z = 0; z < Nz() - 1; ++z ) {
             for ( std::size_t y = 0; y < Ny() - 1; ++y ) {
-                for ( std::size_t x{0}; x < Nx() - 1; ++x ) {
+                #pragma omp simd
+                for ( std::size_t x = 0; x < Nx() - 1; ++x ) {
                     // ∂Bx/∂t = -(∂Ez/∂y - ∂Ey/∂z)
                     Bx_[idx(x,y,z)] -= dt() * curl_X( Ey_[idx(x,y,z)], Ey_[idx(x,y,z+1)],
                                                       Ez_[idx(x,y,z)], Ez_[idx(x,y+1,z)] );
@@ -71,7 +73,8 @@ public:
         #pragma omp parallel for collapse(2)
         for ( std::size_t z = 1; z < Nz(); ++z ) {
             for ( std::size_t y = 1; y < Ny(); ++y ) {
-                for ( std::size_t x{1}; x < Nx(); ++x ) {
+                #pragma omp simd
+                for ( std::size_t x = 1; x < Nx(); ++x ) {
                     // ∂Ex/∂t = c*c * (∂Ez/∂y - ∂Ey/∂z)
                     Ex_[idx(x,y,z)] += dt() * c_sq() * curl_X( By_[idx(x,y,z-1)], By_[idx(x,y,z)],
                                                                Bz_[idx(x,y-1,z)], Bz_[idx(x,y,z)] );
@@ -147,17 +150,19 @@ public:
                       std::size_t const x,
                       std::size_t const y,
                       std::size_t const z ) const {
+        std::size_t index{ idx(x,y,z) };
+
         if ( std::tolower( field ) == 'e' ) {
             switch ( std::tolower( component ) ) {
-                case 'x': return Ex_[idx(x,y,z)];
-                case 'y': return Ey_[idx(x,y,z)];
-                case 'z': return Ez_[idx(x,y,z)];
+                case 'x': return Ex_[index];
+                case 'y': return Ey_[index];
+                case 'z': return Ez_[index];
             }
         } else if ( std::tolower( field ) == 'b' ) {
             switch ( std::tolower( component ) ) {
-                case 'x': return Bx_[idx(x,y,z)];
-                case 'y': return By_[idx(x,y,z)];
-                case 'z': return Bz_[idx(x,y,z)];
+                case 'x': return Bx_[index];
+                case 'y': return By_[index];
+                case 'z': return Bz_[index];
             }
         }
         std::cout << "ERROR! CHECK PARAMETERS!" << std::endl;
@@ -194,27 +199,30 @@ public:
 };
 
 int main() {
+    
     /* 
         To compile and run.
 
-        For No Parallel:
+        For No Parallel (NOT RECOMMENDED):
         g++ -std=c++17 main.cpp -o main.exe
 
-        For Parallel:
+        For Parallel (RECOMMENDED):
         g++ -std=c++17 main.cpp -o main.exe -fopenmp
 
         ./main.exe
     */
 
-    Grid grid{ 50, 50, 5 };
+    Grid grid{ 100, 100, 5 };
 
-    for ( int t{}; t <= 100; ++t ) {
+    auto start = std::chrono::high_resolution_clock::now();
+    for ( int t{}; t <= 1000; ++t ) {
         grid.inject_source( 5, 5, 1, std::sin( 0.1 * t ) );
         grid.step();
-
-        if ( t % 10 == 0 ) {
-            grid.output_slice(1, "output_" + std::to_string(t) + ".csv");
-        }
     }
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << "Time: " << duration.count() << " ms" << std::endl;
+
     return 0;
 }
