@@ -199,7 +199,6 @@ public:
 };
 
 int main() {
-    
     /* 
         To compile and run.
 
@@ -212,12 +211,16 @@ int main() {
         ./main.exe
     */
 
-    Grid grid{ 100, 100, 5 };
+    Grid grid{ 50, 50, 50 };
 
     auto start = std::chrono::high_resolution_clock::now();
     for ( int t{}; t <= 1000; ++t ) {
-        grid.inject_source( 5, 5, 1, std::sin( 0.1 * t ) );
+        grid.inject_source( 5, 5, 1, 10 * std::sin( 0.5 * t ) );
+        grid.inject_source( 45, 45, 1, 10 * std::sin( 0.5 * t ) );
         grid.step();
+        if ( t % 10 == 0 ) {
+            grid.output_slice( 1, "output/output" + std::to_string( t ) + ".csv" );
+        }
     }
     auto end = std::chrono::high_resolution_clock::now();
 
