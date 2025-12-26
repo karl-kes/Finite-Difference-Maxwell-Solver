@@ -20,13 +20,19 @@ int main() {
 
     // Clear previous and create new output folder.
     std::filesystem::remove_all("output");
-    std::filesystem::create_directories("output");
+    std::filesystem::create_directories("output/E");
+    std::filesystem::create_directories("output/B");
 
-    static constexpr int elapsed_time{ 5000 };
-    static constexpr std::size_t Nx{ 20 }, Ny{ 20 }, Nz{ 20 };
-    static constexpr double inject{ 10.0 };
+    static constexpr int elapsed_time{ 1000 };
+    static constexpr std::size_t Nx{ 11 }, Ny{ 11 }, Nz{ 11 };
+    static constexpr double inject{ 1000.0 };
+    static constexpr char B_field{ 'B' };
+    static constexpr char E_field{ 'E' };
 
     Grid grid{ Nx, Ny, Nz };
+
+    grid.vector_volume("output/E/E0.bin", E_field );
+    grid.vector_volume("output/B/B0.bin", B_field );
 
     grid.inject_source( 3*Nx/4, 3*Ny/4,3*Nz/4, inject );
     grid.inject_source( Nx/4, Ny/4, Nz/4, inject );
@@ -35,7 +41,7 @@ int main() {
     double max_energy_drift{ initial_energy };
 
     auto start = std::chrono::high_resolution_clock::now();
-    for ( int t{}; t <= elapsed_time; ++t ) {
+    for ( int t{ 1 }; t <= elapsed_time; ++t ) {
         grid.step();
 
         // Max between current and previous max.
@@ -43,13 +49,14 @@ int main() {
 
         if ( t % 10 == 0 ) {
             std::string t_sec{ std::to_string( t ) };
-            grid.vector_volume( "output/E" + t_sec + ".csv", 'E' );
+            grid.vector_volume( "output/E/E" + t_sec + ".bin", E_field );
+            grid.vector_volume( "output/B/B" + t_sec + ".bin", B_field );
         }
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-    double drift{ 100 * ( max_energy_drift - initial_energy ) / initial_energy };
+    double drift{ 100.0 * ( max_energy_drift - initial_energy ) / initial_energy };
 
     std::cout << "Physical Time Simulated: " << elapsed_time * grid.dt() << " s" << std::endl;
     std::cout << "Duration of Simulation: " << duration.count() << " ms" << std::endl;

@@ -124,31 +124,31 @@ void Grid::magnitude_volume( std::string const &file_name, char const field ) {
     file.close();
 }
 void Grid::vector_volume( std::string const &file_name, char const field ) {
-    // std::ofstream file( file_name );
-    
-    // for ( std::size_t z = 0; z < Nz(); ++z ) {
-    //     for ( std::size_t y = 0; y < Ny(); ++y ) {
-    //         for ( std::size_t x = 0; x < Nx(); ++x ) {
-    //             double Fx{ get_field( field, 'x', x, y, z ) };
-    //             double Fy{ get_field( field, 'y', x, y, z ) };
-    //             double Fz{ get_field( field, 'z', x, y, z ) };
-    //             double mag{ field_mag( field, x, y, z ) };
-                
-    //             file << x << "," << y << "," << z << ","
-    //                  << Fx << "," << Fy << "," << Fz << ","
-    //                  << mag << "\n";
-    //         }
-    //     }
-    // }
+    std::ofstream file( file_name, std::ios::binary | std::ios::out );
 
-    std::ofstream file( file_name );
-
-    // Header
-    uint64_t dimension[3]{ (uint64_t)Nx(), (uint64_t)Ny(), (uint64_t)Nz() };
+    uint64_t dimension[3]{ (uint64_t)(Nx()-1), (uint64_t)(Ny()-1), (uint64_t)(Nz()-1) };
     file.write( reinterpret_cast<const char*>( dimension ), sizeof( dimension ) );
 
-    const std::size_t slice_size_bytes{ Nx() * Ny() * 4 * sizeof( double ) };
-    const std::size_t header_offset{ sizeof( dimension ) }; 
+    std::vector<double> buffer{};
+    buffer.reserve( (Nx()-1) * (Ny()-1) * 4 );
+
+    for ( std::size_t z = 0; z < Nz() - 1; ++z ) {
+        buffer.clear();
+        for ( std::size_t y = 0; y < Ny() - 1; ++y ) {
+            for ( std::size_t x = 0; x < Nx() - 1; ++x ) {
+                double Fx_avg{ 0.5 * ( get_field( field, 'x', x, y, z ) + get_field( field, 'x', x+1, y, z ) ) };
+                double Fy_avg{ 0.5 * ( get_field( field, 'y', x, y, z ) + get_field( field, 'y', x, y+1, z ) ) };
+                double Fz_avg{ 0.5 * ( get_field( field, 'z', x, y, z ) + get_field( field, 'z', x, y, z+1 ) ) };
+
+                buffer.push_back( Fx_avg );
+                buffer.push_back( Fy_avg );
+                buffer.push_back( Fz_avg );
+                buffer.push_back( std::sqrt( Fx_avg*Fx_avg + Fy_avg*Fy_avg + Fz_avg*Fz_avg ) );
+            }
+        }
+        file.write( reinterpret_cast<const char*>( buffer.data() ), buffer.size() * sizeof( double ) );
+    }
+    file.close();
 }
 
 // Getters:
