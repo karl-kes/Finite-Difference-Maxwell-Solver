@@ -9,7 +9,7 @@ dx_{ new_dx }, dy_{ new_dy }, dz_{ new_dz },
 eps_{ new_eps }, mu_{ new_mu } {
 
     c_ = 1.0 / std::sqrt( mu() * eps() );
-    dt_ = 0.1 / ( c() * std::sqrt( 1.0/(dx()*dx()) + 1.0/(dy()*dy()) + 1.0/(dz()*dz()) ) );
+    dt_ = 0.02 / ( c() * std::sqrt( 1.0/(dx()*dx()) + 1.0/(dy()*dy()) + 1.0/(dz()*dz()) ) );
     
     std::size_t const grid_size{ Nx_ * Ny_ * Nz_ };
     Ex_ = std::make_unique<double[]>( grid_size );
@@ -77,6 +77,8 @@ void Grid::inject_source( std::size_t const x,
                           std::size_t const y,
                           std::size_t const z, 
                           double const value ) {
+    Ex_[idx(x,y,z)] += value;
+    Ey_[idx(x,y,z)] += value;
     Ez_[idx(x,y,z)] += value;
 }
 void Grid::vector_volume( std::string const &file_name, char const field ) {
@@ -231,14 +233,31 @@ double Grid::total_energy() const {
 
     return energy * dV;
 }
+double Grid::div_B() const {
+    double max_div{};
+
+    #pragma omp parallel for collapse( 2 ) reduction( max:max_div )
+    for ( std::size_t z = 1; z < Nz(); ++z ) {
+        for ( std::size_t y = 1; y < Ny(); ++y ) {
+            for ( std::size_t x = 1; x < Nx(); ++x ) {
+                double div{ ( Bx_[idx(x,y,z)] - Bx_[idx(x-1,y,z)] ) / dx() +
+                            ( By_[idx(x,y,z)] - By_[idx(x,y-1,z)] ) / dy() +
+                            ( Bz_[idx(x,y,z)] - Bz_[idx(x,y,z-1)] ) / dz() };
+                max_div = std::max( max_div, std::abs( div ) );
+            }
+        }
+    }
+    return max_div;
+}
 void Grid::create_directories() const {
     // Clear previous and create new output folder.
     std::filesystem::remove_all("output");
     std::filesystem::create_directories("output/E");
     std::filesystem::create_directories("output/B");
 }
-void Grid::output_final_metrics( int elapsed_time, std::chrono::milliseconds duration, double drift ) const {
+void Grid::output_final_metrics( int elapsed_time, std::chrono::milliseconds duration, double drift, double max_div_B ) const {
     std::cout << "Physical Time Simulated: " << elapsed_time * dt() << " s" << std::endl;
     std::cout << "Duration of Simulation: " << duration.count() << " ms" << std::endl;
     std::cout << "Max Energy Drift: " << drift << "%" << std::endl;
+    std::cout << "Max Magnetic Divergence: " << max_div_B << std::endl;
 }

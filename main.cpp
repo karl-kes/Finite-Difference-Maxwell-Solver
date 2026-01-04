@@ -17,28 +17,31 @@ int main() {
     */
 
     static constexpr int elapsed_time{ 1000 };
+
     static constexpr std::size_t Nx{ 10 }, Ny{ 10 }, Nz{ 10 };
     static constexpr double inject{ 1000.0 };
+
     static constexpr char B_field{ 'B' };
     static constexpr char E_field{ 'E' };
 
     Grid grid{ Nx+1, Ny+1, Nz+1 };
+
     grid.create_directories();
-
-    grid.vector_volume("output/E/E0.bin", E_field );
-    grid.vector_volume("output/B/B0.bin", B_field );
-
     grid.inject_source( Nx/2, Ny/2, Nz/2, inject );
 
     double initial_energy{ grid.total_energy() };
+    double initial_div_B{ grid.div_B() };
+
     double max_energy_drift{ initial_energy };
+    double max_div_B{ initial_div_B };
 
     auto start{ std::chrono::high_resolution_clock::now() };
-    for ( int t{ 1 }; t <= elapsed_time; ++t ) {
+    for ( int t{}; t <= elapsed_time; ++t ) {
         grid.step();
 
         // Max between current and previous max.
         max_energy_drift = std::max( grid.total_energy(), max_energy_drift );
+        max_div_B = std::max( grid.div_B(), max_div_B );
 
         if ( t % 10 == 0 ) {
             std::string t_sec{ std::to_string( t ) };
@@ -51,7 +54,7 @@ int main() {
 
     double drift{ 100.0 * ( max_energy_drift - initial_energy ) / initial_energy };
 
-    grid.output_final_metrics( elapsed_time, duration, drift );
+    grid.output_final_metrics( elapsed_time, duration, drift, max_div_B );
 
     return 0;
 }

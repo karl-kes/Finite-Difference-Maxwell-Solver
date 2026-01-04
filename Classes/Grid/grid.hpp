@@ -25,7 +25,7 @@ private:
 public:
     // Constructor:
     Grid( std::size_t new_Nx = 10, std::size_t new_Ny = 10, std::size_t new_Nz = 10,
-          double new_dx = 1.0, double new_dy = 1.0, double new_dz = 1.0,
+          double new_dx = 5.0, double new_dy = 5.0, double new_dz = 5.0,
           double new_eps = 1.0, double new_mu = 1.0 );
 
     // System Simulation:
@@ -79,7 +79,8 @@ public:
     double curl_z( double const Y_0, double const Y_1,
                    double const X_0, double const X_1 ) const;
 
+    double div_B() const;
     double total_energy() const;
     void create_directories() const;
-    void output_final_metrics( int elapsed_time, std::chrono::milliseconds duration, double drift ) const;
+    void output_final_metrics( int elapsed_time, std::chrono::milliseconds duration, double drift, double max_div_B ) const;
 };
