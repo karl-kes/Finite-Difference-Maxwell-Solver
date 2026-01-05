@@ -13,12 +13,12 @@
 
 class Grid {
 private:
-    std::size_t Nx_, Ny_, Nz_;                  // Grid Size
-    double dx_, dy_, dz_;                       // Spatial Differentials
-    double eps_;                                // Epsilon
-    double mu_;                                 // Mu
-    double c_;                                  // Speed
-    double dt_;                                 // Time Differential
+    std::size_t const Nx_, Ny_, Nz_;            // Grid Size
+    double const dx_, dy_, dz_;                 // Spatial Differentials
+    double const eps_;                          // Epsilon
+    double const mu_;                           // Mu
+    double const c_;                            // Speed
+    double const dt_;                           // Time Differential
     std::unique_ptr<double[]> Ex_, Ey_, Ez_;    // Electric Field
     std::unique_ptr<double[]> Bx_, By_, Bz_;    // Magnetic Field
 

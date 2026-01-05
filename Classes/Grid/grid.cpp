@@ -6,10 +6,9 @@ Grid::Grid( std::size_t new_Nx, std::size_t new_Ny, std::size_t new_Nz,
             double new_eps, double new_mu ):
 Nx_{ new_Nx }, Ny_{ new_Ny }, Nz_{ new_Nz },
 dx_{ new_dx }, dy_{ new_dy }, dz_{ new_dz },
-eps_{ new_eps }, mu_{ new_mu } {
-
-    c_ = 1.0 / std::sqrt( mu() * eps() );
-    dt_ = 0.02 / ( c() * std::sqrt( 1.0/(dx()*dx()) + 1.0/(dy()*dy()) + 1.0/(dz()*dz()) ) );
+eps_{ new_eps }, mu_{ new_mu },
+c_{ 1.0 / std::sqrt( mu() * eps() ) },
+dt_{ 0.02 / ( c() * std::sqrt( 1.0/(dx()*dx()) + 1.0/(dy()*dy()) + 1.0/(dz()*dz()) ) ) } {
     
     std::size_t const grid_size{ Nx_ * Ny_ * Nz_ };
     Ex_ = std::make_unique<double[]>( grid_size );
