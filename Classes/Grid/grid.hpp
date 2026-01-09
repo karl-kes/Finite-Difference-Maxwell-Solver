@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../constant.hpp"
+
 #include <memory>
 #include <cmath>
 #include <fstream>
@@ -32,10 +34,13 @@ public:
     void update_B();
     void update_E();
     void step();
-    void inject_source( std::size_t const x,
-                        std::size_t const y,
-                        std::size_t const z, 
-                        double const value );
+    void hard_source_inject( std::size_t const x,
+                             std::size_t const y,
+                             std::size_t const z, 
+                             double const value );
+    void soft_source_inject();
+    void dipole_antenna_inject();
+    void gaussian_pulse_inject();
     void vector_volume( std::string const &file_name, char const field );
 
     // Getters:
@@ -65,6 +70,7 @@ public:
                       std::size_t const z ) const;
 
     // Helpers:
+    void print_progress( int curr_time, int total_time ) const;
     // Finds 3D index
     std::size_t idx( std::size_t const x,
                      std::size_t const y,
@@ -79,8 +85,7 @@ public:
     double curl_z( double const Y_0, double const Y_1,
                    double const X_0, double const X_1 ) const;
 
-    // Div(B) and total energy for validation
-    double div_B() const;
+    // Total energy for validation
     double total_energy() const;
     // Deletes previous data and creates new files
     void create_directories() const;

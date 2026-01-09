@@ -1,5 +1,4 @@
 #include "grid.hpp"
-#include "../../constant.hpp"
 
 // Constructor:
 Grid::Grid( std::size_t new_Nx, std::size_t new_Ny, std::size_t new_Nz,
@@ -73,13 +72,22 @@ void Grid::step() {
     update_B();
     update_E();
 }
-void Grid::inject_source( std::size_t const x,
-                          std::size_t const y,
-                          std::size_t const z, 
-                          double const value ) {
+void Grid::hard_source_inject( std::size_t const x,
+                               std::size_t const y,
+                               std::size_t const z, 
+                               double const value ) {
     Ex_[idx(x,y,z)] += value;
     Ey_[idx(x,y,z)] += value;
     Ez_[idx(x,y,z)] += value;
+}
+void Grid::soft_source_inject() {
+
+}
+void Grid::dipole_antenna_inject() {
+
+}
+void Grid::gaussian_pulse_inject() {
+
 }
 void Grid::vector_volume( std::string const &file_name, char const field ) {
     std::ofstream file( file_name, std::ios::binary | std::ios::out );
@@ -184,6 +192,14 @@ double Grid::field_mag( char const field,
 }
 
 // Helpers:
+void Grid::print_progress( int curr_time, int total_time ) const {
+    double percent{ 100.0 * curr_time / total_time };
+    std::cout << "\rProgress: " << percent << "%" << std::flush;
+    
+    if ( curr_time == total_time ) {
+        std::cout << std::endl;  // New line when done
+    }
+}
 // Finds 3D index
 std::size_t Grid::idx( std::size_t const x,
                        std::size_t const y,
@@ -231,24 +247,7 @@ double Grid::total_energy() const {
             }
         }
     }
-
     return energy * dV;
-}
-double Grid::div_B() const {
-    double max_div{};
-
-    #pragma omp parallel for collapse( 2 ) reduction( max:max_div )
-    for ( std::size_t z = 0; z < Nz() - 1; ++z ) {
-        for ( std::size_t y = 0; y < Ny() - 1; ++y ) {
-            for ( std::size_t x = 0; x < Nx() - 1; ++x ) {
-                double div{ ( Bx_[idx(x+1,y,z)] - Bx_[idx(x,y,z)] ) / dx() +
-                            ( By_[idx(x,y+1,z)] - By_[idx(x,y,z)] ) / dy() +
-                            ( Bz_[idx(x,y,z+1)] - Bz_[idx(x,y,z)] ) / dz() };
-                max_div = std::max( max_div, std::abs( div ) );
-            }
-        }
-    }
-    return max_div;
 }
 void Grid::create_directories() const {
     // Clear previous and create new output folder.
