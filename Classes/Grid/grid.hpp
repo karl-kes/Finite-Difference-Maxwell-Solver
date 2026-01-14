@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../constant.hpp"
+#include "../../config.hpp"
 
 #include <memory>
 #include <cmath>
@@ -34,6 +34,10 @@ public:
     void update_B();
     void update_E();
     void step();
+
+    void straight_wire_x( double const current,
+                          std::size_t const y, std::size_t const z );
+
     void hard_source_inject( double const value,
                              std::size_t const x, std::size_t const y, std::size_t const z );
 

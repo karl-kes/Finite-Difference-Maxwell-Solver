@@ -15,33 +15,33 @@
 */
 
 int main() {
-    Grid grid{ constant::Nx+1, constant::Ny+1, constant::Nz+1,
-               constant::dx, constant::dy, constant::dz,
-               constant::eps, constant::mu };
+    Grid grid{ config::Nx+1, config::Ny+1, config::Nz+1,
+               config::dx, config::dy, config::dz,
+               config::eps, config::mu,  };
     grid.create_directories();
 
-    grid.hard_source_inject( constant::inject,
-                             constant::Nx/2, constant::Ny/2, constant::Nz/2 );
+    grid.hard_source_inject( config::inject,
+                             config::Nx/2, config::Ny/2, config::Nz/2 );
 
-    grid.dipole_antenna_inject( constant::amp_one, constant::amp_two,
-                                constant::freq_one, constant::freq_two,
-                                constant::inject,
-                                constant::Nx/4, constant::Ny/4, constant::Nz/4 );
+    grid.dipole_antenna_inject( config::amp_one, config::amp_two,
+                                config::freq_one, config::freq_two,
+                                config::inject,
+                                config::Nx/4, config::Ny/4, config::Nz/4 );
 
     double initial_energy{ grid.total_energy() };
     double max_energy_drift{ initial_energy };
 
     auto start{ std::chrono::high_resolution_clock::now() };
-    for ( std::size_t curr_time{}; curr_time <= constant::total_time; ++curr_time ) {
+    for ( std::size_t curr_time{}; curr_time <= config::total_time; ++curr_time ) {
         grid.step();
 
         max_energy_drift = std::max( grid.total_energy(), max_energy_drift );
 
-        if ( curr_time % constant::print_rate == 0 ) {
-            grid.print_progress( curr_time, constant::total_time );
+        if ( curr_time % config::print_rate == 0 ) {
+            grid.print_progress( curr_time, config::total_time );
             std::string t_sec{ std::to_string( curr_time ) };
-            grid.vector_volume( "output/E/E" + t_sec + ".bin", constant::E_field );
-            grid.vector_volume( "output/B/B" + t_sec + ".bin", constant::B_field );
+            grid.vector_volume( "output/E/E" + t_sec + ".bin", config::E_field );
+            grid.vector_volume( "output/B/B" + t_sec + ".bin", config::B_field );
         }
     }
     auto end = std::chrono::high_resolution_clock::now();
@@ -51,7 +51,7 @@ int main() {
 
     std::cout << std::endl;
     std::cout << "Duration of Simulation: " << duration.count() << " ms" << std::endl;
-    std::cout << "Physical Time Simulated: " << constant::total_time * grid.dt() << " s" << std::endl;
+    std::cout << "Physical Time Simulated: " << config::total_time * grid.dt() << " s" << std::endl;
     std::cout << "Max Energy Drift: " << max_energy_drift << "%\n" << std::endl;
 
     return 0;

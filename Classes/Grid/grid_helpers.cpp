@@ -47,6 +47,7 @@ double Grid::total_energy() const {
     #pragma omp parallel for collapse( 2 ) reduction( +:energy )
     for ( std::size_t z = 0; z < Nz(); ++z ) {
         for ( std::size_t y = 0; y < Ny(); ++y ) {
+            #pragma omp simd
             for ( std::size_t x = 0; x < Nx(); ++x ) {
                 std::size_t i = idx(x,y,z);
 

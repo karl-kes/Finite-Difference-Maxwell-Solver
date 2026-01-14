@@ -59,6 +59,13 @@ void Grid::step() {
     update_E();
 }
 
+void Grid::straight_wire_x( double const current,
+                            std::size_t const y, std::size_t const z ) {
+    for ( std::size_t x{1}; x < Nx()-1; ++x ) {
+        Jx_[idx(x,y,z)] = current;
+    }
+}
+
 void Grid::hard_source_inject( double const value,
                                std::size_t const x, std::size_t const y, std::size_t const z ) {
     Ex_[idx(x,y,z)] += value;
@@ -68,7 +75,7 @@ void Grid::hard_source_inject( double const value,
 
 void Grid::soft_source_inject( double const injection,
                                std::size_t const x, std::size_t const y, std::size_t const z ) {
-
+    
 }
 
 void Grid::dipole_antenna_inject( double const amp_one, double const amp_two,
