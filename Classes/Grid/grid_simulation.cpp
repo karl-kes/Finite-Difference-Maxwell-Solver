@@ -37,15 +37,18 @@ void Grid::update_E() {
                 // Curl of components and apply E += ∂E:
                 // ∂E_x = ∂t * c*c * (∂E_z/∂y - ∂E_y/∂z)
                 Ex_[idx(x,y,z)] += dt() * ( c_sq() * curl_x( By_[idx(x,y,z-1)], By_[idx(x,y,z)],
-                                                             Bz_[idx(x,y-1,z)], Bz_[idx(x,y,z)] ) - Jx_[idx(x,y,z)] / eps() );
+                                                             Bz_[idx(x,y-1,z)], Bz_[idx(x,y,z)] )
+                                                    - Jx_[idx(x,y,z)] / eps() );
 
                 // ∂E_y = ∂t * c*c * (∂Ex/∂z - ∂Ez/∂x)
                 Ey_[idx(x,y,z)] += dt() * ( c_sq() * curl_y( Bx_[idx(x,y,z-1)], Bx_[idx(x,y,z)],
-                                                             Bz_[idx(x-1,y,z)], Bz_[idx(x,y,z)] ) - Jy_[idx(x,y,z)] / eps() );
+                                                             Bz_[idx(x-1,y,z)], Bz_[idx(x,y,z)] )
+                                                    - Jy_[idx(x,y,z)] / eps() );
 
                 // ∂E_z = ∂t * c*c * (∂Ex/∂y - ∂Ey/∂x)
                 Ez_[idx(x,y,z)] += dt() * ( c_sq() * curl_z( By_[idx(x-1,y,z)], By_[idx(x,y,z)],
-                                                             Bx_[idx(x,y-1,z)], Bx_[idx(x,y,z)] ) - Jz_[idx(x,y,z)] / eps() ) ;
+                                                             Bx_[idx(x,y-1,z)], Bx_[idx(x,y,z)] )
+                                                    - Jz_[idx(x,y,z)] / eps() ) ;
             }
         }
     }
