@@ -35,7 +35,8 @@ public:
     void update_E();
     void step();
 
-    void straight_wire_x( double const current,
+    void straight_wire_x( double const amp, double const freq,
+                          std::size_t const time,
                           std::size_t const y, std::size_t const z );
 
     void hard_source_inject( double const value,

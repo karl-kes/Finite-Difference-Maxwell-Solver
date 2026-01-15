@@ -20,19 +20,20 @@ int main() {
                config::eps, config::mu,  };
     grid.create_directories();
 
-    grid.hard_source_inject( config::inject,
-                             config::Nx/2, config::Ny/2, config::Nz/2 );
+    // grid.hard_source_inject( config::inject,
+    //                          config::Nx/2, config::Ny/2, config::Nz/2 );
 
-    grid.dipole_antenna_inject( config::amp_one, config::amp_two,
-                                config::freq_one, config::freq_two,
-                                config::inject,
-                                config::Nx/4, config::Ny/4, config::Nz/4 );
+    // grid.dipole_antenna_inject( config::amp_one, config::amp_two,
+    //                             config::freq_one, config::freq_two,
+    //                             config::inject,
+    //                             config::Nx/4, config::Ny/4, config::Nz/4 );
 
     double initial_energy{ grid.total_energy() };
     double max_energy_drift{ initial_energy };
 
     auto start{ std::chrono::high_resolution_clock::now() };
     for ( std::size_t curr_time{}; curr_time <= config::total_time; ++curr_time ) {
+        grid.straight_wire_x( config::amp_one, config::freq_one, curr_time, config::Ny/2, config::Nz/2 );
         grid.step();
 
         max_energy_drift = std::max( grid.total_energy(), max_energy_drift );

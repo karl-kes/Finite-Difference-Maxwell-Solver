@@ -7,9 +7,9 @@ namespace config {
     static constexpr char E_field{ 'e' };
     static constexpr double PI{ 3.14159 };
 
-    static constexpr std::size_t Nx{ 12 }, Ny{ 12 }, Nz{ 12 };
+    static constexpr std::size_t Nx{ 15 }, Ny{ 15 }, Nz{ 15 };
     static constexpr double dx{ 5.0 }, dy{ 5.0 }, dz{ 5.0 };
-    static constexpr double eps{ 8.854e-12 }, mu{ 1.2566e-6 };
+    static constexpr double eps{ 1.0 }, mu{ 1.0 };
 
     static constexpr double cfl_factor{ 0.1 };
     static constexpr std::size_t total_time{ 1000 };

@@ -59,9 +59,16 @@ void Grid::step() {
     update_E();
 }
 
-void Grid::straight_wire_x( double const current,
+void Grid::straight_wire_x( double const amp, double const freq,
+                            std::size_t const time,
                             std::size_t const y, std::size_t const z ) {
-    for ( std::size_t x{1}; x < Nx()-1; ++x ) {
+    double const omega{ 2.0 * config::PI * freq };
+    double current{ amp * std::sin( omega * time ) };
+
+    std::size_t const start{ Nx()/4 };
+    std::size_t const end{ 3*Nx()/4 };
+
+    for ( std::size_t x{ start }; x <= end; ++x ) {
         Jx_[idx(x,y,z)] = current;
     }
 }
