@@ -1,4 +1,4 @@
-# 3D FDTD Electromagnetic Wave Simulator
+# 3D Finite-Difference Time-Domain Maxwell Solver
 
 A high-performance Finite-Difference Time-Domain (FDTD) solver for Maxwell's equations in 3D, implemented in C++ with OpenMP parallelization and interactive Plotly visualization.
 
@@ -28,7 +28,7 @@ The time step is automatically calculated to satisfy the Courant-Friedrichs-Lewy
 
 $$\Delta t \leq \frac{\alpha}{c \sqrt{\frac{1}{\Delta x^2} + \frac{1}{\Delta y^2} + \frac{1}{\Delta z^2}}}$$
 
-where α is a configurable CFL factor (default 0.1) for stability margin.
+where α (0 < α <= 1.0) is a configurable CFL factor (default 0.1) for stability margin.
 
 ## Features
 
