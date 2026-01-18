@@ -32,21 +32,23 @@ int main() {
     output.initialize();
 
     // Add sources:
-    grid.add_source( std::make_unique<Straight_Wire_X>(
-        100.0,                          // amplitude
-        1.0,                            // frequency
-        config.Ny / 2,                  // y position
-        config.Nz / 2,                  // z position
-        config.Nx / 4,                  // x start
-        3 * config.Nx / 4               // x end
-    ) );
-
-    // grid.add_source( std::make_unique<Point_Source>(
-    //     100.0,
-    //     config.Nx / 2,
-    //     config.Ny / 2,
-    //     config.Nz / 2
+    // grid.add_source( std::make_unique<Straight_Wire_X>(
+    //     100.0,                          // amplitude
+    //     1.0,                            // frequency
+    //     config.Ny / 2,                  // y position
+    //     config.Nz / 2,                  // z position
+    //     config.Nx / 4,                  // x start
+    //     3 * config.Nx / 4               // x end
     // ) );
+
+    grid.add_source( std::make_unique<Point_Source>(
+        100.0,
+        config.Nx / 2,
+        config.Ny / 2,
+        config.Nz / 2
+    ) );
+    
+    grid.apply_sources( 0.0 );
 
     // Track Energy:
     double initial_energy{ grid.total_energy() };
@@ -57,7 +59,6 @@ int main() {
     auto start_time{ std::chrono::high_resolution_clock::now() };
 
     for ( std::size_t curr_time{}; curr_time <= config.total_time; ++curr_time ) {
-        grid.apply_sources( curr_time );
         grid.step();
 
         max_energy = std::max(grid.total_energy(), max_energy);

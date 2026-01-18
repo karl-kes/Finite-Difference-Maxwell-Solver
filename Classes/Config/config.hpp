@@ -27,7 +27,7 @@ struct Simulation_Config {
     // Material Properties:
     double mu{ 1.0 };
     double eps{ 1.0 };
-    double c{ 1.0 / ( mu * eps ) };
+    double c{ 1.0 / ( std::sqrt ( mu * eps ) ) };
 
     // Time Stepping:
     double cfl_factor{ 0.1 };

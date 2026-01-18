@@ -54,7 +54,7 @@ public:
     explicit Grid( Simulation_Config const &config );
 
     // Non-copyable and Non-movable:
-    Grid (Grid const& ) = delete;
+    Grid ( Grid const& ) = delete;
     Grid &operator=( Grid const& ) = delete;
     Grid( Grid&& ) = default;
     Grid &operator=( Grid&& ) = default;

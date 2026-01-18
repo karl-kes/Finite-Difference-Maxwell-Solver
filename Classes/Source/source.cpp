@@ -6,7 +6,7 @@ void Straight_Wire_X::apply( Grid &grid, double time_step ) {
     double current{ amplitude_ * std::sin( omega * time_step ) };
 
     for ( std::size_t x{ x_start_ }; x <= x_end_; ++x ) {
-        grid.Jx( x, y_, z_ ) = current;
+        grid.Jx( x, y_, z_ ) += current;
     }
 }
 
@@ -21,5 +21,5 @@ void Point_Source::apply( Grid &grid, double time_step ) {
 void Gaussian_Pulse::apply( Grid& grid, double time_step ) {
     double exponent{ -0.5 * ( ( time_step - t_0_ ) / width_ ) * ( ( time_step - t_0_ ) / width_ ) };
     
-    grid.Jz(x_, y_, z_) = amplitude_ * std::exp(exponent);
+    grid.Jz(x_, y_, z_) += amplitude_ * std::exp(exponent);
 }
