@@ -61,7 +61,7 @@ public:
 
     // System Simulation:
     void step();
-    void apply_sources( double time_step );
+    void apply_sources( double time_step = 0.0 );
     void add_source( std::unique_ptr<Source> source );
 
     // Field Access:

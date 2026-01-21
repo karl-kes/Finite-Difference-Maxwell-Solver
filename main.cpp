@@ -48,7 +48,7 @@ int main() {
         config.Nz / 2
     ) );
     
-    grid.apply_sources( 0.0 );
+    grid.apply_sources();
 
     // Track Energy:
     double initial_energy{ grid.total_energy() };
@@ -64,9 +64,9 @@ int main() {
         max_energy = std::max(grid.total_energy(), max_energy);
 
         if ( ( curr_time % output_interval ) == 0 ) {
-            print_progress( curr_time, config.total_time );
             output.write_field( grid, Field_Type::electric, curr_time );
             output.write_field( grid, Field_Type::magnetic, curr_time );
+            print_progress( curr_time, config.total_time );
         }
     }
 
@@ -75,7 +75,7 @@ int main() {
     auto duration{ std::chrono::duration_cast<std::chrono::milliseconds>( end_time - start_time ) };
 
     // Report results
-    double energy_drift{ 100.0 * ( max_energy - initial_energy ) / initial_energy };
+    double energy_drift{ ( initial_energy == 0 ) ? 0.0 : ( 100.0 * ( max_energy - initial_energy ) / initial_energy ) };
 
     std::cout << "\n\n";
     std::cout << "Simulation Complete\n";
