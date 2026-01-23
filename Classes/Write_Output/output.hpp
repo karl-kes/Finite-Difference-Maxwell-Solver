@@ -22,5 +22,5 @@ public:
     void write_field( Grid const &grid, Field_Type field, double time_step ) const;
 
     // Generates the file for each time step:
-    std::string file_name( Field_Type field, double time_step ) const;
+    std::string file_name( Field_Type field, std::size_t time_step ) const;
 };

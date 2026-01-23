@@ -14,9 +14,9 @@
 
 struct Simulation_Config {
     // Grid Dimensions:
-    std::size_t Nx{ 16 };
-    std::size_t Ny{ 16 };
-    std::size_t Nz{ 16 };
+    std::size_t Nx{ 12 };
+    std::size_t Ny{ 12 };
+    std::size_t Nz{ 12 };
     std::size_t size{ ( Nx + 1 ) * ( Ny + 1 ) * ( Nz + 1 ) };
 
     // Spatial Step Size:
@@ -31,7 +31,7 @@ struct Simulation_Config {
 
     // Time Stepping:
     double cfl_factor{ 0.1 };
-    double total_time{ 1000.0 };
+    double total_time{ 10000.0 };
     double dt{ cfl_factor / ( c * std::sqrt( 1.0 / (dx*dx) + 1.0 / (dy*dy) + 1.0 / (dz*dz) ) ) };
 
     std::size_t output_interval() const {

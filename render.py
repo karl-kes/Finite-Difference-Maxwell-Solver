@@ -38,7 +38,7 @@ for ef, bf in zip(e_files, b_files):
         b_volume_list.append(np.sqrt(np.nan_to_num(np.maximum(b_mag, 0))))
         b_vector_list.append(b_vec)
 
-nz, ny, nx = shape
+nx, ny, nz = shape
 z, y, x = np.mgrid[0:nz, 0:ny, 0:nx]
 
 step = 1
@@ -52,6 +52,11 @@ b_vmax = max([v.max() for v in b_volume_list]) if b_volume_list else 1.0
 if e_vmax < 1e-10: e_vmax = 1.0
 if b_vmax < 1e-10: b_vmax = 1.0
 
+e_vec_max = max([np.sqrt((v[:,:,:,0]**2 + v[:,:,:,1]**2 + v[:,:,:,2]**2)).max() for v in e_vector_list]) if e_vector_list else 1.0
+b_vec_max = max([np.sqrt((v[:,:,:,0]**2 + v[:,:,:,1]**2 + v[:,:,:,2]**2)).max() for v in b_vector_list]) if b_vector_list else 1.0
+if e_vec_max < 1e-10: e_vec_max = 1.0
+if b_vec_max < 1e-10: b_vec_max = 1.0
+
 # 3. Build Frames
 frames = []
 for i in range(len(e_volume_list)):
@@ -62,13 +67,13 @@ for i in range(len(e_volume_list)):
     e_Fy = e_vec[::step, ::step, ::step, 1].flatten()
     e_Fz = e_vec[::step, ::step, ::step, 2].flatten()
     e_mag_sub = np.sqrt(e_Fx**2 + e_Fy**2 + e_Fz**2)
-    e_mask = (e_mag_sub > e_vmax * 0.1).flatten()
+    e_mask = (e_mag_sub > e_vec_max * 0.1).flatten()
     
     b_Fx = b_vec[::step, ::step, ::step, 0].flatten()
     b_Fy = b_vec[::step, ::step, ::step, 1].flatten()
     b_Fz = b_vec[::step, ::step, ::step, 2].flatten()
     b_mag_sub = np.sqrt(b_Fx**2 + b_Fy**2 + b_Fz**2)
-    b_mask = (b_mag_sub > b_vmax * 0.1).flatten()
+    b_mask = (b_mag_sub > b_vec_max * 0.1).flatten()
     
     frames.append(go.Frame(
         data=[
@@ -118,13 +123,13 @@ e_Fx = e_vec[::step, ::step, ::step, 0].flatten()
 e_Fy = e_vec[::step, ::step, ::step, 1].flatten()
 e_Fz = e_vec[::step, ::step, ::step, 2].flatten()
 e_mag_sub = np.sqrt(e_Fx**2 + e_Fy**2 + e_Fz**2)
-e_mask = e_mag_sub > e_vmax * 0.1
+e_mask = e_mag_sub > e_vec_max * 0.1
 
 b_Fx = b_vec[::step, ::step, ::step, 0].flatten()
 b_Fy = b_vec[::step, ::step, ::step, 1].flatten()
 b_Fz = b_vec[::step, ::step, ::step, 2].flatten()
 b_mag_sub = np.sqrt(b_Fx**2 + b_Fy**2 + b_Fz**2)
-b_mask = b_mag_sub > b_vmax * 0.1
+b_mask = b_mag_sub > b_vec_max * 0.1
 
 # 5. Simulate
 fig = go.Figure(
