@@ -71,51 +71,52 @@ void Grid::step() {
     update_E();
 }
 
-double Grid::field(
-    char field, char component, 
+double Grid::field (
+    Field field,
+    Component component,
     std::size_t x, std::size_t y, std::size_t z ) const {
-    if ( field == 'e' ) {
+    if ( field == Field::ELECTRIC ) {
         switch ( component ) {
-            case 'x': return Ex(x,y,z);
-            case 'y': return Ey(x,y,z);
-            case 'z': return Ez(x,y,z);
+            case Component::X: return Ex(x,y,z);
+            case Component::Y: return Ey(x,y,z);
+            case Component::Z: return Ez(x,y,z);
         }
-    } else if ( field == 'b' ) {
+    } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case 'x': return Bx(x,y,z);
-            case 'y': return By(x,y,z);
-            case 'z': return Bz(x,y,z);
+            case Component::X: return Bx(x,y,z);
+            case Component::Y: return By(x,y,z);
+            case Component::Z: return Bz(x,y,z);
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
 }
 
 double &Grid::field(
-    char field,
-    char component,
-    std::size_t x,
-    std::size_t y,
-    std::size_t z ) {
-    if ( field == 'e' ) {
+    Field field,
+    Component component,
+    std::size_t x, std::size_t y, std::size_t z ) {
+    if ( field == Field::ELECTRIC ) {
         switch ( component ) {
-            case 'x': return Ex(x,y,z);
-            case 'y': return Ey(x,y,z);
-            case 'z': return Ez(x,y,z);
+            case Component::X: return Ex(x,y,z);
+            case Component::Y: return Ey(x,y,z);
+            case Component::Z: return Ez(x,y,z);
         }
-    } else if ( field == 'b' ) {
+    } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case 'x': return Bx(x,y,z);
-            case 'y': return By(x,y,z);
-            case 'z': return Bz(x,y,z);
+            case Component::X: return Bx(x,y,z);
+            case Component::Y: return By(x,y,z);
+            case Component::Z: return Bz(x,y,z);
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
 }
 
-double Grid::field_magnitude(char field, std::size_t x, std::size_t y, std::size_t z) const {
-    double Fx{ this->field( field, 'x', x, y, z ) };
-    double Fy{ this->field( field, 'y', x, y, z ) };
-    double Fz{ this->field( field, 'z', x, y, z ) };
+double Grid::field_magnitude(
+    Field field,
+    std::size_t x, std::size_t y, std::size_t z ) const {
+    double Fx{ this->field( field, Component::X, x, y, z ) };
+    double Fy{ this->field( field, Component::X, x, y, z ) };
+    double Fz{ this->field( field, Component::X, x, y, z ) };
 
     return std::sqrt( Fx*Fx + Fy*Fy + Fz*Fz );
 }

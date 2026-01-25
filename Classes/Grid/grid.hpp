@@ -38,16 +38,16 @@ private:
     // Curl Calculation:
     // Calculation flipped to fix Plotly left-hand rule default.
     [[nodiscard]] double curl_x(
-                         double Y_0, double Y_1,
-                         double Z_0, double Z_1) const;
+                    double Y_0, double Y_1,
+                    double Z_0, double Z_1) const;
 
     [[nodiscard]] double curl_y(
-                         double X_0, double X_1,
-                         double Z_0, double Z_1 ) const;
+                    double X_0, double X_1,
+                    double Z_0, double Z_1 ) const;
 
     [[nodiscard]] double curl_z(
-                         double Y_0, double Y_1,
-                         double X_0, double X_1 ) const;
+                    double Y_0, double Y_1,
+                    double X_0, double X_1 ) const;
 
     // Field Updates:
     void update_B();
@@ -70,15 +70,16 @@ public:
 
     // Field Access:
     [[nodiscard]] double field(
-                         char field, char component,
-                         std::size_t x, std::size_t y, std::size_t z ) const;
+                    Field field, Component component,
+                    std::size_t x, std::size_t y, std::size_t z ) const;
 
-    [[nodiscard]] double &field( char field, char component,
-                   std::size_t x, std::size_t y, std::size_t z );
+    [[nodiscard]] double &field(
+                    Field field, Component component,
+                    std::size_t x, std::size_t y, std::size_t z );
 
     [[nodiscard]] double field_magnitude(
-                         char field,
-                         std::size_t x, std::size_t y, std::size_t z ) const;
+                    Field field,
+                    std::size_t x, std::size_t y, std::size_t z ) const;
 
     // Electric, Magnetic, Current Access:
     // Read only:

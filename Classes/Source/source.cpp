@@ -13,9 +13,9 @@ void Straight_Wire_X::apply( Grid &grid, double time_step ) {
 void Point_Source::apply( Grid &grid, double time_step ) {
     ( void )time_step;
 
-    grid.field( 'e', 'x', x_, y_, z_ ) += value_;
-    grid.field( 'e', 'y', x_, y_, z_ ) += value_;
-    grid.field( 'e', 'z', x_, y_, z_ ) += value_;
+    grid.field( Field::ELECTRIC, Component::X, x_, y_, z_ ) += value_;
+    grid.field( Field::ELECTRIC, Component::Y, x_, y_, z_ ) += value_;
+    grid.field( Field::ELECTRIC, Component::Z, x_, y_, z_ ) += value_;
 }
 
 void Gaussian_Pulse::apply( Grid& grid, double time_step ) {

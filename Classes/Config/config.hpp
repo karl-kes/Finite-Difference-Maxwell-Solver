@@ -34,9 +34,18 @@ struct Simulation_Config {
     double total_time{ 10000.0 };
     double dt{ cfl_factor / ( c * std::sqrt( 1.0 / (dx*dx) + 1.0 / (dy*dy) + 1.0 / (dz*dz) ) ) };
 
-    std::size_t output_interval() const {
-        return total_time / 50;
-    }
+    std::size_t output_interval() const { return total_time / 50; }
+};
+
+enum class Field {
+    ELECTRIC,
+    MAGNETIC
+};
+
+enum class Component {
+    X,
+    Y,
+    Z
 };
 
 namespace config {

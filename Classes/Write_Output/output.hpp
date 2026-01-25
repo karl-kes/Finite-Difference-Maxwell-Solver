@@ -1,11 +1,8 @@
 #pragma once
 
-class Grid;
+#include "../Config/config.hpp"
 
-enum class Field {
-    ELECTRIC,
-    MAGNETIC
-};
+class Grid;
 
 class Output {
 private:

@@ -31,7 +31,7 @@ void Output::write_field( Grid const& grid, Field field, double time_step ) cons
     };
     file.write( reinterpret_cast<char const*>( dimensions ), sizeof( dimensions ) );
 
-    char field_char{ ( field == Field::ELECTRIC ) ? 'e' : 'b' };
+    Field field_type{ ( field == Field::ELECTRIC ) ? Field::ELECTRIC : Field::MAGNETIC };
 
     std::vector<double> buffer;
     buffer.reserve( nx * ny * 4 );
@@ -42,14 +42,14 @@ void Output::write_field( Grid const& grid, Field field, double time_step ) cons
         for ( std::size_t y = 0; y < ny; ++y ) {
             for ( std::size_t x = 0; x < nx; ++x ) {
                 // Average to cell centers for visualization; deals with Yee staggering:
-                double Fx{ 0.5 * ( grid.field( field_char, 'x', x, y, z ) + 
-                                   grid.field( field_char, 'x', x+1, y, z ) ) };
+                double Fx{ 0.5 * ( grid.field( field_type, Component::X, x, y, z ) + 
+                                   grid.field( field_type, Component::X, x+1, y, z ) ) };
 
-                double Fy{ 0.5 * ( grid.field( field_char, 'y', x, y, z ) + 
-                                   grid.field( field_char, 'y', x, y+1, z ) ) };
+                double Fy{ 0.5 * ( grid.field( field_type, Component::Y, x, y, z ) + 
+                                   grid.field( field_type, Component::Y, x, y+1, z ) ) };
 
-                double Fz{ 0.5 * ( grid.field( field_char, 'z', x, y, z ) + 
-                                   grid.field( field_char, 'z', x, y, z+1 ) ) };
+                double Fz{ 0.5 * ( grid.field( field_type, Component::Z, x, y, z ) + 
+                                   grid.field( field_type, Component::Z, x, y, z+1 ) ) };
 
                 double mag{ std::sqrt( Fx*Fx + Fy*Fy + Fz*Fz ) };
 

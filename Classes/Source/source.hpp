@@ -20,13 +20,18 @@ private:
     std::size_t x_start_, x_end_;
 
 public:
-    Straight_Wire_X( double amp, double freq,
-                     std::size_t y, std::size_t z,
-                     std::size_t x_start, std::size_t x_end ):
-    amplitude_{ amp },
-    frequency_{ freq },
-    y_{ y }, z_{ z },
-    x_start_{ x_start }, x_end_{ x_end } {}
+    Straight_Wire_X(
+        double amp, 
+        double freq,
+        std::size_t y, std::size_t z,
+        std::size_t x_start, std::size_t x_end )
+        : amplitude_{ amp }
+        , frequency_{ freq }
+        , y_{ y }
+        , z_{ z }
+        , x_start_{ x_start }
+        , x_end_{ x_end }
+        { }
 
     void apply( Grid &grid, double time_step ) override;
 };
@@ -38,10 +43,14 @@ private:
     std::size_t x_, y_, z_;
 
 public:
-    Point_Source( double value,
-                  std::size_t x, std::size_t y, std::size_t z ):
-    value_{ value },
-    x_{ x }, y_{ y }, z_{ z } {}
+    Point_Source(
+        double value,
+        std::size_t x, std::size_t y, std::size_t z )
+        : value_{ value }
+        , x_{ x }
+        , y_{ y }
+        , z_{ z }
+        { }
 
     void apply( Grid &grid, double time_step ) override;
 };
@@ -55,12 +64,16 @@ private:
     std::size_t x_, y_, z_;
 
 public:
-    Gaussian_Pulse( double amp, double t_0, double width,
-                    std::size_t x, std::size_t y, std::size_t z ):
-    amplitude_{ amp },
-    t_0_{ t_0 },
-    width_{ width },
-    x_{ x }, y_{ y }, z_{ z } {}
+    Gaussian_Pulse(
+        double amp,
+        double t_0, 
+        double width,
+        std::size_t x, std::size_t y, std::size_t z )
+        : amplitude_{ amp }
+        , t_0_{ t_0 }
+        , width_{ width }
+        , x_{ x }, y_{ y }, z_{ z }
+        { }
 
     void apply( Grid &grid, double time_step ) override;
 };
