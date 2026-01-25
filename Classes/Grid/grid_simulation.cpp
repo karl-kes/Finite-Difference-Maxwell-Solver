@@ -115,8 +115,8 @@ double Grid::field_magnitude(
     Field field,
     std::size_t x, std::size_t y, std::size_t z ) const {
     double Fx{ this->field( field, Component::X, x, y, z ) };
-    double Fy{ this->field( field, Component::X, x, y, z ) };
-    double Fz{ this->field( field, Component::X, x, y, z ) };
+    double Fy{ this->field( field, Component::Y, x, y, z ) };
+    double Fz{ this->field( field, Component::Z, x, y, z ) };
 
     return std::sqrt( Fx*Fx + Fy*Fy + Fz*Fz );
 }

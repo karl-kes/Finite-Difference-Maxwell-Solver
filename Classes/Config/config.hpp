@@ -31,7 +31,7 @@ struct Simulation_Config {
 
     // Time Stepping:
     double cfl_factor{ 0.1 };
-    double total_time{ 10000.0 };
+    double total_time{ 5000.0 };
     double dt{ cfl_factor / ( c * std::sqrt( 1.0 / (dx*dx) + 1.0 / (dy*dy) + 1.0 / (dz*dz) ) ) };
 
     std::size_t output_interval() const { return total_time / 50; }
