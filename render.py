@@ -114,7 +114,7 @@ for i in range(len(e_volume_list)):
     ))
 
 # 4. Initial frame
-start_idx = next((i for i, v in enumerate(e_volume_list) if v.max() > 0.01), 0)
+start_idx = next((i for i, v in enumerate(e_volume_list) if v.max() > 0.001), 0)
 
 e_vol, e_vec = e_volume_list[start_idx], e_vector_list[start_idx]
 b_vol, b_vec = b_volume_list[start_idx], b_vector_list[start_idx]

@@ -45,7 +45,7 @@ private:
     [[nodiscard]] double curl_y(
                     double X_0, double X_1,
                     double Z_0, double Z_1 ) const
-                    { return ( Z_1 - Z_0 ) / dx() - ( X_1 - X_0 ) / dz(); }
+                    { return ( X_1 - X_0 ) / dz() - ( Z_1 - Z_0 ) / dx(); }
 
     [[nodiscard]] double curl_z(
                     double Y_0, double Y_1,
