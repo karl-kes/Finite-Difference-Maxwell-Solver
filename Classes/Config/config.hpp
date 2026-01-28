@@ -14,9 +14,9 @@
 
 struct Simulation_Config {
     // Grid Dimensions:
-    std::size_t Nx{ 60 };
-    std::size_t Ny{ 60 };
-    std::size_t Nz{ 60 };
+    std::size_t Nx{ 100 };
+    std::size_t Ny{ 100 };
+    std::size_t Nz{ 100 };
     std::size_t size{ ( Nx + 1 ) * ( Ny + 1 ) * ( Nz + 1 ) };
 
     // Spatial Step Size:

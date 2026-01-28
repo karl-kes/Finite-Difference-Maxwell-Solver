@@ -66,8 +66,8 @@ int main() {
         max_energy = std::max( grid.total_energy(), max_energy );
 
         if ( ( curr_time % output_interval ) == 0 ) {
-            output.write_field( grid, Field::ELECTRIC, curr_time );
-            output.write_field( grid, Field::MAGNETIC, curr_time );
+            // output.write_field( grid, Field::ELECTRIC, curr_time );
+            // output.write_field( grid, Field::MAGNETIC, curr_time );
             print_progress( curr_time, config.total_time );
         }
     }
