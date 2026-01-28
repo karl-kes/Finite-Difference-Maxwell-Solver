@@ -66,9 +66,15 @@ void Grid::update_E() {
     }
 }
 
-void Grid::step() {
+void Grid::step( Simulation_Config const &config, Output const &output, std::size_t curr_time ) {
     update_B();
     update_E();
+
+    if ( ( curr_time % config.output_interval() ) == 0 ) {
+        output.write_field( *this, Field::ELECTRIC, curr_time );
+        output.write_field( *this, Field::MAGNETIC, curr_time );
+        print_progress( curr_time, config.total_time );
+    }
 }
 
 double Grid::field(

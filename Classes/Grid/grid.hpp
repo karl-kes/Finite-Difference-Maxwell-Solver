@@ -8,6 +8,7 @@
 
 #include "../Config/config.hpp"
 #include "../Source/source.hpp"
+#include "../Write_Output/output.hpp"
 
 class Grid {
 private:
@@ -56,6 +57,11 @@ private:
     void update_B();
     void update_E();
 
+    void print_progress( double current, double total ) {
+        double percent{ 100.0 * current / total };
+        std::cout << "\rProgress: " << percent << "%" << std::flush;
+    }
+
 public:
     // Constructor:
     explicit Grid( Simulation_Config const &config );
@@ -67,7 +73,7 @@ public:
     Grid &operator=( Grid&& ) = default;
 
     // System Simulation:
-    void step();
+    void step( Simulation_Config const &config, Output const &output, std::size_t curr_time );
     void apply_sources( double time_step = 0.0 );
     void add_source( std::unique_ptr<Source> source );
 

@@ -17,11 +17,6 @@
     ./render.py
 */
 
-void print_progress( double current, double total ) {
-    double percent{ 100.0 * current / total };
-    std::cout << "\rProgress: " << percent << "%" << std::flush;
-}
-
 int main() {
     // Configure:
     Simulation_Config config{};
@@ -49,7 +44,7 @@ int main() {
     ) );
     
     grid.apply_sources();
-    grid.step();
+    grid.step( config, output, 0);
 
     // Track Energy:
     double initial_energy{ grid.total_energy() };
@@ -61,15 +56,8 @@ int main() {
 
     for ( std::size_t curr_time{}; curr_time <= config.total_time; ++curr_time ) {
         // grid.apply_sources( curr_time );
-        grid.step();
-
+        grid.step( config, output, curr_time );
         max_energy = std::max( grid.total_energy(), max_energy );
-
-        if ( ( curr_time % output_interval ) == 0 ) {
-            output.write_field( grid, Field::ELECTRIC, curr_time );
-            output.write_field( grid, Field::MAGNETIC, curr_time );
-            print_progress( curr_time, config.total_time );
-        }
     }
 
     // End Timer:
