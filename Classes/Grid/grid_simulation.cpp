@@ -4,7 +4,7 @@ void Grid::add_source( std::unique_ptr<Source> source ) {
     sources_.push_back( std::move( source ) );
 }
 
-void Grid::apply_sources( double time_step ) {
+void Grid::apply_sources( double const time_step ) {
     for ( auto const &source : sources_ ) {
         source->apply( *this, time_step );
     }
@@ -66,7 +66,7 @@ void Grid::update_E() {
     }
 }
 
-void Grid::step( Simulation_Config const &config, Output const &output, std::size_t curr_time ) {
+void Grid::step( Simulation_Config const &config, Output const &output, std::size_t const curr_time ) {
     update_B();
     update_E();
 
@@ -78,9 +78,9 @@ void Grid::step( Simulation_Config const &config, Output const &output, std::siz
 }
 
 double Grid::field(
-    Field field,
-    Component component,
-    std::size_t x, std::size_t y, std::size_t z ) const {
+    Field const field,
+    Component const component,
+    std::size_t const x, std::size_t const y, std::size_t const z ) const {
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
             case Component::X: return Ex(x,y,z);
@@ -98,9 +98,9 @@ double Grid::field(
 }
 
 double &Grid::field(
-    Field field,
-    Component component,
-    std::size_t x, std::size_t y, std::size_t z ) {
+    Field const field,
+    Component const component,
+    std::size_t const x, std::size_t const y, std::size_t const z ) {
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
             case Component::X: return Ex(x,y,z);
@@ -118,8 +118,8 @@ double &Grid::field(
 }
 
 double Grid::field_magnitude(
-    Field field,
-    std::size_t x, std::size_t y, std::size_t z ) const {
+    Field const field,
+    std::size_t const x, std::size_t const y, std::size_t const z ) const {
     double Fx{ this->field( field, Component::X, x, y, z ) };
     double Fy{ this->field( field, Component::Y, x, y, z ) };
     double Fz{ this->field( field, Component::Z, x, y, z ) };
@@ -129,15 +129,15 @@ double Grid::field_magnitude(
 
 double Grid::total_energy() const {
     double energy{};
-    double dV{ dx() * dy() * dz() };
+    double const dV{ dx() * dy() * dz() };
 
     #pragma omp parallel for collapse( 2 ) reduction( +:energy )
     for ( std::size_t z = 0; z < Nz(); ++z ) {
         for ( std::size_t y = 0; y < Ny(); ++y ) {
             #pragma omp simd
             for ( std::size_t x = 0; x < Nx(); ++x ) {
-                    double E_sq{ Ex(x,y,z)*Ex(x,y,z) + Ey(x,y,z)*Ey(x,y,z) + Ez(x,y,z)*Ez(x,y,z) };
-                    double B_sq{ Bx(x,y,z)*Bx(x,y,z) + By(x,y,z)*By(x,y,z) + Bz(x,y,z)*Bz(x,y,z) };
+                    double const E_sq{ Ex(x,y,z)*Ex(x,y,z) + Ey(x,y,z)*Ey(x,y,z) + Ez(x,y,z)*Ez(x,y,z) };
+                    double const B_sq{ Bx(x,y,z)*Bx(x,y,z) + By(x,y,z)*By(x,y,z) + Bz(x,y,z)*Bz(x,y,z) };
 
                     energy += 0.5 * ( eps() * E_sq + B_sq / mu() );
             }

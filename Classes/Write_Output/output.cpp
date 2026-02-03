@@ -1,18 +1,7 @@
 #include "../Grid/grid.hpp"
 #include "output.hpp"
 
-void Output::initialize() const {
-    std::filesystem::remove_all( base_path_ );
-    std::filesystem::create_directories( base_path_ + "/E" );
-    std::filesystem::create_directories( base_path_ + "/B" );
-}
-
-std::string Output::file_name ( Field field, std::size_t time_step ) const {
-    std::string prefix{ ( field == Field::ELECTRIC ) ? "/E/E" : "/B/B" };
-    return base_path_ + prefix + std::to_string( time_step ) + ".bin";
-}
-
-void Output::write_field( Grid const& grid, Field field, double time_step ) const {
+void Output::write_field( Grid const& grid, Field const field, double const time_step ) const {
     std::string path{ file_name( field, time_step ) };
     std::ofstream file( path, std::ios::binary | std::ios::out );
     

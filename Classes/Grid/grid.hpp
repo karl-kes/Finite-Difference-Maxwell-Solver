@@ -34,31 +34,31 @@ private:
 
     // Private Methods:
     // Finds flattened 1D index given 3D space:
-    [[nodiscard]] std::size_t idx( std::size_t x, std::size_t y, std::size_t z ) const { return x + Nx() * ( y + Ny() * z ); }
+    [[nodiscard]] std::size_t idx( std::size_t const x, std::size_t const y, std::size_t const z ) const { return x + Nx() * ( y + Ny() * z ); }
 
     // Curl Calculation:
     // Calculation flipped to fix Plotly left-hand rule default.
     [[nodiscard]] double curl_x(
-                    double Y_0, double Y_1,
-                    double Z_0, double Z_1) const
+                    double const Y_0, double const Y_1,
+                    double const Z_0, double const Z_1) const
                     { return ( Z_1 - Z_0 ) / dy() - ( Y_1 - Y_0 ) / dz(); }
 
     [[nodiscard]] double curl_y(
-                    double X_0, double X_1,
-                    double Z_0, double Z_1 ) const
+                    double const X_0, double const X_1,
+                    double const Z_0, double const Z_1 ) const
                     { return ( X_1 - X_0 ) / dz() - ( Z_1 - Z_0 ) / dx(); }
 
     [[nodiscard]] double curl_z(
-                    double Y_0, double Y_1,
-                    double X_0, double X_1 ) const 
+                    double const Y_0, double const Y_1,
+                    double const X_0, double const X_1 ) const 
                     { return ( Y_1 - Y_0 ) / dx() - ( X_1 - X_0 ) / dy(); }
 
     // Field Updates:
     void update_B();
     void update_E();
 
-    void print_progress( double current, double total ) {
-        double percent{ 100.0 * current / total };
+    void print_progress( double const current, double const total ) const {
+        double const percent{ 100.0 * current / total };
         std::cout << "\rProgress: " << percent << "%" << std::flush;
     }
 
@@ -73,22 +73,22 @@ public:
     Grid &operator=( Grid&& ) = default;
 
     // System Simulation:
-    void step( Simulation_Config const &config, Output const &output, std::size_t curr_time );
-    void apply_sources( double time_step = 0.0 );
+    void step( Simulation_Config const &config, Output const &output, std::size_t const curr_time );
+    void apply_sources( double const time_step = 0.0 );
     void add_source( std::unique_ptr<Source> source );
 
     // Field Access:
     [[nodiscard]] double field(
-                    Field field, Component component,
-                    std::size_t x, std::size_t y, std::size_t z ) const;
+                    Field const field, Component const component,
+                    std::size_t const x, std::size_t const y, std::size_t const z ) const;
 
     [[nodiscard]] double &field(
-                    Field field, Component component,
-                    std::size_t x, std::size_t y, std::size_t z );
+                    Field const field, Component const component,
+                    std::size_t const x, std::size_t const y, std::size_t const z );
 
     [[nodiscard]] double field_magnitude(
-                    Field field,
-                    std::size_t x, std::size_t y, std::size_t z ) const;
+                    Field const field,
+                    std::size_t const x, std::size_t const y, std::size_t const z ) const;
 
     // Getters:
     // Dimensions:
@@ -112,30 +112,30 @@ public:
 
     // Field Components:
     // Read Only:
-    [[nodiscard]] const double &Ex( std::size_t x, std::size_t y, std::size_t z ) const { return Ex_[idx(x,y,z)]; }
-    [[nodiscard]] const double &Ey( std::size_t x, std::size_t y, std::size_t z ) const { return Ey_[idx(x,y,z)]; }
-    [[nodiscard]] const double &Ez( std::size_t x, std::size_t y, std::size_t z ) const { return Ez_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Ex( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Ex_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Ey( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Ey_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Ez( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Ez_[idx(x,y,z)]; }
 
-    [[nodiscard]] const double &Bx( std::size_t x, std::size_t y, std::size_t z ) const { return Bx_[idx(x,y,z)]; }
-    [[nodiscard]] const double &By( std::size_t x, std::size_t y, std::size_t z ) const { return By_[idx(x,y,z)]; }
-    [[nodiscard]] const double &Bz( std::size_t x, std::size_t y, std::size_t z ) const { return Bz_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Bx( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Bx_[idx(x,y,z)]; }
+    [[nodiscard]] const double &By( std::size_t const x, std::size_t const y, std::size_t const z ) const { return By_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Bz( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Bz_[idx(x,y,z)]; }
 
-    [[nodiscard]] const double &Jx( std::size_t x, std::size_t y, std::size_t z ) const { return Jx_[idx(x,y,z)]; }
-    [[nodiscard]] const double &Jy( std::size_t x, std::size_t y, std::size_t z ) const { return Jy_[idx(x,y,z)]; }
-    [[nodiscard]] const double &Jz( std::size_t x, std::size_t y, std::size_t z ) const { return Jz_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Jx( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Jx_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Jy( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Jy_[idx(x,y,z)]; }
+    [[nodiscard]] const double &Jz( std::size_t const x, std::size_t const y, std::size_t const z ) const { return Jz_[idx(x,y,z)]; }
 
     // Writable:
-    double &Ex( std::size_t x, std::size_t y, std::size_t z ) { return Ex_[idx(x,y,z)]; }
-    double &Ey( std::size_t x, std::size_t y, std::size_t z ) { return Ey_[idx(x,y,z)]; }
-    double &Ez( std::size_t x, std::size_t y, std::size_t z ) { return Ez_[idx(x,y,z)]; }
+    double &Ex( std::size_t const x, std::size_t const y, std::size_t const z ) { return Ex_[idx(x,y,z)]; }
+    double &Ey( std::size_t const x, std::size_t const y, std::size_t const z ) { return Ey_[idx(x,y,z)]; }
+    double &Ez( std::size_t const x, std::size_t const y, std::size_t const z ) { return Ez_[idx(x,y,z)]; }
 
-    double &Bx( std::size_t x, std::size_t y, std::size_t z ) { return Bx_[idx(x,y,z)]; }
-    double &By( std::size_t x, std::size_t y, std::size_t z ) { return By_[idx(x,y,z)]; }
-    double &Bz( std::size_t x, std::size_t y, std::size_t z ) { return Bz_[idx(x,y,z)]; }
+    double &Bx( std::size_t const x, std::size_t const y, std::size_t const z ) { return Bx_[idx(x,y,z)]; }
+    double &By( std::size_t const x, std::size_t const y, std::size_t const z ) { return By_[idx(x,y,z)]; }
+    double &Bz( std::size_t const x, std::size_t const y, std::size_t const z ) { return Bz_[idx(x,y,z)]; }
 
-    double &Jx( std::size_t x, std::size_t y, std::size_t z ) { return Jx_[idx(x,y,z)]; }
-    double &Jy( std::size_t x, std::size_t y, std::size_t z ) { return Jy_[idx(x,y,z)]; }
-    double &Jz( std::size_t x, std::size_t y, std::size_t z ) { return Jz_[idx(x,y,z)]; }
+    double &Jx( std::size_t const x, std::size_t const y, std::size_t const z ) { return Jx_[idx(x,y,z)]; }
+    double &Jy( std::size_t const x, std::size_t const y, std::size_t const z ) { return Jy_[idx(x,y,z)]; }
+    double &Jz( std::size_t const x, std::size_t const y, std::size_t const z ) { return Jz_[idx(x,y,z)]; }
 
     // Diagnostics:
     [[nodiscard]] double total_energy() const;

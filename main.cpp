@@ -47,13 +47,14 @@ int main() {
     grid.step( config, output, 0);
 
     // Track Energy:
-    double initial_energy{ grid.total_energy() };
+    double const initial_energy{ grid.total_energy() };
     double max_energy{ initial_energy };
 
     // Run simulation and start timer:
-    std::size_t output_interval{ config.output_interval() };
-    auto start_time{ std::chrono::high_resolution_clock::now() };
+    std::size_t const output_interval{ config.output_interval() };
+    auto const start_time{ std::chrono::high_resolution_clock::now() };
 
+    // Simulation Loop:
     for ( std::size_t curr_time{}; curr_time <= config.total_time; ++curr_time ) {
         // grid.apply_sources( curr_time );
         grid.step( config, output, curr_time );
@@ -61,11 +62,11 @@ int main() {
     }
 
     // End Timer:
-    auto end_time{ std::chrono::high_resolution_clock::now() };
-    auto duration{ std::chrono::duration_cast<std::chrono::milliseconds>( end_time - start_time ) };
+    auto const end_time{ std::chrono::high_resolution_clock::now() };
+    auto const duration{ std::chrono::duration_cast<std::chrono::milliseconds>( end_time - start_time ) };
 
     // Report results
-    double energy_drift{ ( initial_energy == 0.0 ) ? 0.0 : ( 100.0 * ( max_energy - initial_energy ) / initial_energy ) };
+    double const energy_drift{ ( initial_energy == 0.0 ) ? 0.0 : ( 100.0 * ( max_energy - initial_energy ) / initial_energy ) };
 
     std::cout << "\n\n";
     std::cout << "Simulation Complete\n";

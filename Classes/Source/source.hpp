@@ -8,7 +8,7 @@ class Grid;
 class Source {
 public:
     virtual ~Source() = default;
-    virtual void apply( Grid &grid, double time_step ) = 0;
+    virtual void apply( Grid &grid, double const time_step ) = 0;
 };
 
 // Straight wire with sinusoidal current along x:
@@ -21,10 +21,10 @@ private:
 
 public:
     Straight_Wire_X(
-        double amp, 
-        double freq,
-        std::size_t y, std::size_t z,
-        std::size_t x_start, std::size_t x_end )
+        double const amp, 
+        double const freq,
+        std::size_t const y, std::size_t const z,
+        std::size_t const x_start, std::size_t const x_end )
         : amplitude_{ amp }
         , frequency_{ freq }
         , y_{ y }
@@ -33,7 +33,7 @@ public:
         , x_end_{ x_end }
         { }
 
-    void apply( Grid &grid, double time_step ) override;
+    void apply( Grid &grid, double const time_step ) override;
 };
 
 // Hard source injection at single point:
@@ -44,15 +44,15 @@ private:
 
 public:
     Point_Source(
-        double value,
-        std::size_t x, std::size_t y, std::size_t z )
+        double const value,
+        std::size_t const x, std::size_t const y, std::size_t const z )
         : value_{ value }
         , x_{ x }
         , y_{ y }
         , z_{ z }
         { }
 
-    void apply( Grid &grid, double time_step ) override;
+    void apply( Grid &grid, double const time_step ) override;
 };
 
 // Gaussian pulse current source:
@@ -65,15 +65,15 @@ private:
 
 public:
     Gaussian_Pulse(
-        double amp,
-        double t_0, 
-        double width,
-        std::size_t x, std::size_t y, std::size_t z )
+        double const amp,
+        double const t_0, 
+        double const width,
+        std::size_t const x, std::size_t const y, std::size_t const z )
         : amplitude_{ amp }
         , t_0_{ t_0 }
         , width_{ width }
         , x_{ x }, y_{ y }, z_{ z }
         { }
 
-    void apply( Grid &grid, double time_step ) override;
+    void apply( Grid &grid, double const time_step ) override;
 };
