@@ -31,7 +31,7 @@ public:
     double c{ 1.0 / ( std::sqrt ( mu * eps ) ) };
 
     // Time Stepping:
-    double cfl_factor{ 0.1 };
+    double cfl_factor{ 0.125 };
     double total_time{ 1000.0 };
     double dt{ cfl_factor / ( c * std::sqrt( 1.0/(dx*dx) + 1.0/(dy*dy) + 1.0/(dz*dz) ) ) };
 
@@ -40,7 +40,7 @@ public:
 
     // PML (Perfectly Matched Layer):
     bool use_pml{ true };
-    std::size_t pml_thickness{ Nx/5 };
+    std::size_t pml_thickness{ 8 };
     int pml_order{ 3 };
     double pml_sigma_max{ 0.8 * ( pml_order + 1 ) / ( dx * std::sqrt( mu / eps ) ) };
     double pml_kappa_max{ 15.0 };

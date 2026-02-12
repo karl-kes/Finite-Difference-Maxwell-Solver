@@ -41,7 +41,7 @@ void Simulation::run() {
 
     // Run @ t = 0:
     grid_.apply_sources();
-    grid_.step( config_, output_, 0 );
+    grid_.step();
 
     // Run simulation and start timer:
     std::size_t const output__interval{ config_.output_interval() };
@@ -50,7 +50,7 @@ void Simulation::run() {
     // Simulation Loop:
     for ( std::size_t curr_time{1}; curr_time <= config_.total_time; ++curr_time ) {
         grid_.apply_sources( curr_time );
-        grid_.step( config_, output_, curr_time );
+        grid_.step();
 
         if ( ( curr_time % config_.output_interval() ) == 0 ) {
             output_.write_field( grid_, curr_time );

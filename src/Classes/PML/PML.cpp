@@ -1,5 +1,13 @@
 #include "PML.hpp"
 
+#if defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#elif defined(_MSC_VER)
+    #define RESTRICT __restrict
+#else
+    #define RESTRICT
+#endif
+
 PML::PML( Simulation_Config const &config )
 : thickness_{ config.use_pml ? config.pml_thickness : 0 }
 , Nx_{ config.Nx + 1 }
@@ -77,9 +85,9 @@ PML::PML( Simulation_Config const &config )
     psi_Bxz_ = alloc_psi_z();  psi_Byz_ = alloc_psi_z();
 }
 
-void PML::update_B_psi( double *Ex, double *Ey, double *Ez,
-                         double *Bx, double *By, double *Bz,
-                         double const dt, double const dx, double const dy, double const dz ) {
+void PML::update_B_psi( double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
+                        double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
+                        double const dt, double const dx, double const dy, double const dz ) {
     if ( !is_active() ) return;
 
     std::size_t const t{ thickness_ };
@@ -197,8 +205,8 @@ void PML::update_B_psi( double *Ex, double *Ey, double *Ez,
     }
 }
 
-void PML::update_E_psi( double *Ex, double *Ey, double *Ez,
-                        double *Bx, double *By, double *Bz,
+void PML::update_E_psi( double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
+                        double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
                         double const dt, double const dx, double const dy, double const dz,
                         double const c_sq ) {
     if ( !is_active() ) return;

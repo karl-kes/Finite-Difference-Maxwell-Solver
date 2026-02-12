@@ -4,7 +4,7 @@ Plane_Wave_Test::Plane_Wave_Test( Simulation_Config const &cfg )
 : config_{ cfg }
 , grid_{ config_ }
 , output_{ "validation_output" }
-, wavelength_{ 20.0 * grid_.dx() }
+, wavelength_{ compute_wavelength( grid_, config_ ) }
 , wavenumber_{ 2.0 * config::PI / wavelength_ }
 , probe_x_{ grid_.Nx() / 2 }
 , probe_y_{ grid_.Ny() / 2 }
@@ -51,7 +51,7 @@ Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
         sum_product += expected_Ey * actual_Ey;
         total_phase_error += std::abs( actual_Ey - expected_Ey );
 
-        grid_.step( config_, output_, t );
+        grid_.step();
     }
 
     double const final_energy{ grid_.total_energy() };
@@ -75,7 +75,7 @@ Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
     // Pass criteria
     bool const passed{ 
         energy_drift < 5.0 &&      // <5% energy drift
-        correlation > 0.99 &&      // >99.9% correlation
+        correlation > 0.99 &&      // >99% correlation
         dispersion < 10.0          // <10% dispersion
     };
 

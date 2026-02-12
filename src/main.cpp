@@ -7,11 +7,19 @@
 #include "Classes/Validation/Validation.hpp"
 
 /* 
-    To compile and run.
+    To compile and run:
 
     g++ -std=c++17 -O3 -march=native -fopenmp src/main.cpp src/Classes/Grid/*.cpp src/Classes/Source/*.cpp src/Classes/Write_Output/*.cpp src/Classes/PML/*.cpp src/Classes/Simulation/*.cpp src/Classes/Validation/*.cpp -o main.exe
     ./main.exe
     python src/render.py
+
+    rm -r build
+    mkdir build
+    cd build
+    cmake .. -G "MinGW Makefiles"
+    mingw32-make -j
+    .\main.exe
+    python ../src/render.py
 */
 
 int main() {

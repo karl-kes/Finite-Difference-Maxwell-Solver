@@ -41,7 +41,6 @@ private:
     [[nodiscard]] std::size_t idx( std::size_t const x, std::size_t const y, std::size_t const z ) const { return x + Nx() * ( y + Ny() * z ); }
 
     // Curl Calculation:
-    // Calculation flipped to fix Plotly left-hand rule default.
     [[nodiscard]] double curl_x(
                         double const Y_0, double const Y_1,
                         double const Z_0, double const Z_1) const
@@ -65,7 +64,7 @@ public:
     explicit Grid( Simulation_Config const &config );
 
     // System Simulation:
-    void step( Simulation_Config const &config, Output const &output, std::size_t const curr_time );
+    void step();
     void apply_sources( double const time_step = 0.0 );
     void add_source( std::unique_ptr<Source> source );
 

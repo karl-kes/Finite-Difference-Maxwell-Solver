@@ -1,5 +1,13 @@
 #include "grid.hpp"
 
+#if defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#elif defined(_MSC_VER)
+    #define RESTRICT __restrict
+#else
+    #define RESTRICT
+#endif
+
 Grid::Grid( Simulation_Config const &config )
 : Nx_{ config.Nx + 1 }
 , Ny_{ config.Ny + 1 }
@@ -34,25 +42,37 @@ void Grid::apply_sources( double const time_step ) {
 
 void Grid::update_B() {
     // ∂B/∂t = -curl( E )
+
+    double* RESTRICT Bx{ Bx_.get() };
+    double* RESTRICT By{ By_.get() };
+    double* RESTRICT Bz{ Bz_.get() };
+    double* RESTRICT Ex{ Ex_.get() };
+    double* RESTRICT Ey{ Ey_.get() };
+    double* RESTRICT Ez{ Ez_.get() };
+
+    double const dt_local{ dt() };
+
     #pragma omp parallel for collapse( 2 )
     // Start at 0; stagger for Yee-Cell grid.
     for ( std::size_t z = 0; z < Nz() - 1; ++z ) {
         for ( std::size_t y = 0; y < Ny() - 1; ++y ) {
             #pragma omp simd
             for ( std::size_t x = 0; x < Nx() - 1; ++x ) {
+                std::size_t const i{ idx(x,y,z) };
+
                 // Take curl of components and apply B -= ∂B:
-                double const curl_x_E{ curl_x( Ey(x,y,z), Ey(x,y,z+1), Ez(x,y,z), Ez(x,y+1,z) ) };
-                double const curl_y_E{ curl_y( Ex(x,y,z), Ex(x,y,z+1), Ez(x,y,z), Ez(x+1,y,z) ) };
-                double const curl_z_E{ curl_z( Ey(x,y,z), Ey(x+1,y,z), Ex(x,y,z), Ex(x,y+1,z) ) };
+                double const curl_x_E{ curl_x( Ey[i], Ey[idx(x,y,z+1)], Ez[i], Ez[idx(x,y+1,z)] ) };
+                double const curl_y_E{ curl_y( Ex[i], Ex[idx(x,y,z+1)], Ez[i], Ez[idx(x+1,y,z)] ) };
+                double const curl_z_E{ curl_z( Ey[i], Ey[idx(x+1,y,z)], Ex[i], Ex[idx(x,y+1,z)] ) };
 
                 // ∂B_x = ∂t * curl_x( E )
-                Bx(x,y,z) -= dt() * curl_x_E;
+                Bx[i] -= dt_local * curl_x_E;
 
                 // ∂B_y = ∂t * curl_y( E )
-                By(x,y,z) -= dt() * curl_y_E;
+                By[i] -= dt_local * curl_y_E;
 
                 // ∂B_z = ∂t * curl_z( E )
-                Bz(x,y,z) -= dt() * curl_z_E;
+                Bz[i] -= dt_local * curl_z_E;
             }
         }
     }
@@ -63,29 +83,46 @@ void Grid::update_B() {
 
 void Grid::update_E() {
     // ∂E/∂t = c*c * curl(B)
+
+    double* RESTRICT Bx{ Bx_.get() };
+    double* RESTRICT By{ By_.get() };
+    double* RESTRICT Bz{ Bz_.get() };
+    double* RESTRICT Ex{ Ex_.get() };
+    double* RESTRICT Ey{ Ey_.get() };
+    double* RESTRICT Ez{ Ez_.get() };
+    double* RESTRICT Jx{ Jx_.get() };
+    double* RESTRICT Jy{ Jy_.get() };
+    double* RESTRICT Jz{ Jz_.get() };
+
+    double const dt_local{ dt() };
+    double const inv_eps{ 1.0 / eps() };
+    double const c_sq_local{ c_sq() };
+
     #pragma omp parallel for collapse( 2 )
     // Start at 1; stagger for Yee-Cell grid.
     for ( std::size_t z = 1; z < Nz(); ++z ) {
         for ( std::size_t y = 1; y < Ny(); ++y ) {
             #pragma omp simd
             for ( std::size_t x = 1; x < Nx(); ++x ) {
-                // Curl of components and apply E += ∂E:
-                double const curl_x_B{ curl_x( By(x,y,z-1), By(x,y,z), Bz(x,y-1,z), Bz(x,y,z) ) };
-                double const curl_y_B{ curl_y( Bx(x,y,z-1), Bx(x,y,z), Bz(x-1,y,z), Bz(x,y,z) ) };
-                double const curl_z_B{ curl_z( By(x-1,y,z), By(x,y,z), Bx(x,y-1,z), Bx(x,y,z) ) };
+                std::size_t const i{ idx(x,y,z) };
 
-                double const jx_term{ Jx(x,y,z) / eps() };
-                double const jy_term{ Jy(x,y,z) / eps() };
-                double const jz_term{ Jz(x,y,z) / eps() };
+                // Curl of components and apply E += ∂E:
+                double const curl_x_B{ curl_x( By[idx(x,y,z-1)], By[i], Bz[idx(x,y-1,z)], Bz[i] ) };
+                double const curl_y_B{ curl_y( Bx[idx(x,y,z-1)], Bx[i], Bz[idx(x-1,y,z)], Bz[i] ) };
+                double const curl_z_B{ curl_z( By[idx(x-1,y,z)], By[i], Bx[idx(x,y-1,z)], Bx[i] ) };
+
+                double const jx_term{ Jx[i] * inv_eps };
+                double const jy_term{ Jy[i] * inv_eps };
+                double const jz_term{ Jz[i] * inv_eps };
 
                 // ∂E_x = ∂t * c*c * (∂E_z/∂y - ∂E_y/∂z)
-                Ex(x,y,z) += dt() * ( c_sq() * curl_x_B - jx_term );
+                Ex[i] += dt_local * ( c_sq_local * curl_x_B - jx_term );
 
                 // ∂E_y = ∂t * c*c * (∂Ex/∂z - ∂Ez/∂x)
-                Ey(x,y,z) += dt() * ( c_sq() * curl_y_B - jy_term );
+                Ey[i] += dt_local * ( c_sq_local * curl_y_B - jy_term );
 
                 // ∂E_z = ∂t * c*c * (∂Ex/∂y - ∂Ey/∂x)
-                Ez(x,y,z) += dt() * ( c_sq() * curl_z_B - jz_term );
+                Ez[i] += dt_local * ( c_sq_local * curl_z_B - jz_term );
             }
         }
     }
@@ -94,7 +131,7 @@ void Grid::update_E() {
                        dt(), dx(), dy(), dz(), c_sq() );
 }
 
-void Grid::step( Simulation_Config const &config, Output const &output, std::size_t const curr_time ) {
+void Grid::step() {
     update_B();
     update_E();
 }
