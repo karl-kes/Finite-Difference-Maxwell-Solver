@@ -15,9 +15,9 @@
 class Simulation_Config {
 public:
     // Grid Dimensions:
-    std::size_t Nx{ 40 };
-    std::size_t Ny{ 40 };
-    std::size_t Nz{ 40 };
+    std::size_t Nx{ 100 };
+    std::size_t Ny{ 100 };
+    std::size_t Nz{ 100 };
     std::size_t size{ ( Nx + 1 ) * ( Ny + 1 ) * ( Nz + 1 ) };
 
     // Spatial Step Size:
@@ -33,7 +33,7 @@ public:
     // Time Stepping:
     double cfl_factor{ 0.1 };
     double total_time{ 1000.0 };
-    double dt{ cfl_factor / ( c * std::sqrt( 1.0 / (dx*dx) + 1.0 / (dy*dy) + 1.0 / (dz*dz) ) ) };
+    double dt{ cfl_factor / ( c * std::sqrt( 1.0/(dx*dx) + 1.0/(dy*dy) + 1.0/(dz*dz) ) ) };
 
     // Validation:
     bool run_validation{ true };
@@ -46,7 +46,7 @@ public:
     double pml_kappa_max{ 15.0 };
     double pml_alpha_max{ 0.05 };
 
-    std::size_t output_interval() const { return static_cast<std::size_t>( total_time / 50) ; }
+    std::size_t output_interval() const { return static_cast<std::size_t>( total_time / 100) ; }
 };
 
 enum class Field {
