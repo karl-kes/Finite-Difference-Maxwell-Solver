@@ -14,12 +14,10 @@
     python src/render.py
 
     rm -r build
-    mkdir build
-    cd build
-    cmake .. -G "MinGW Makefiles"
-    mingw32-make -j
-    .\main.exe
-    python ../src/render.py
+    cmake -B build -G "MinGW Makefiles"
+    cmake --build build
+    ./build/main.exe
+    python ./src/render.py
 */
 
 int main() {
