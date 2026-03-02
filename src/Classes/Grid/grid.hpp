@@ -41,28 +41,10 @@ private:
     PML pml_;
 
     // Private Methods:
-    // Curl Calculation:
-    [[nodiscard]] double curl_x(
-        double const Y_0, double const Y_1,
-        double const Z_0, double const Z_1) const {
-        return ( Z_1 - Z_0 ) / dy() - ( Y_1 - Y_0 ) / dz();
-    }
-
-    [[nodiscard]] double curl_y(
-        double const X_0, double const X_1,
-        double const Z_0, double const Z_1 ) const{
-            return ( X_1 - X_0 ) / dz() - ( Z_1 - Z_0 ) / dx();
-        }
-
-    [[nodiscard]] double curl_z(
-        double const Y_0, double const Y_1,
-        double const X_0, double const X_1 ) const {
-            return ( Y_1 - Y_0 ) / dx() - ( X_1 - X_0 ) / dy();
-        }
-
     // Field Updates:
     void update_B();
     void update_E();
+    
 public:
     // Constructor:
     explicit Grid( Simulation_Config const &config );
@@ -77,7 +59,7 @@ public:
         std::size_t const x,
         std::size_t const y,
         std::size_t const z ) const {
-            return x + Nx() * ( y + Ny() * z );
+        return x + Nx() * ( y + Ny() * z );
     }
 
     // Field Access:

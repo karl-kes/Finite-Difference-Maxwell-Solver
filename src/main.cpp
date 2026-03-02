@@ -9,14 +9,19 @@
 /* 
     To compile and run:
 
-    g++ -std=c++17 -O3 -march=native -fopenmp src/main.cpp src/Classes/Grid/*.cpp src/Classes/Source/*.cpp src/Classes/Write_Output/*.cpp src/Classes/PML/*.cpp src/Classes/Simulation/*.cpp src/Classes/Validation/*.cpp -o main.exe
-    ./main.exe
-    python src/render.py
+    # DEBUG MODE:
+    rm -r build
+    cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug
+    cmake --build build
+    ./build/main.exe
 
+    # RELEASE MODE:
     rm -r build
     cmake -B build -G "MinGW Makefiles"
     cmake --build build
     ./build/main.exe
+
+    # RENDER:
     python ./src/render.py
 */
 

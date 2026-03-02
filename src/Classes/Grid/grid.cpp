@@ -48,19 +48,44 @@ void Grid::update_B() {
     double* RESTRICT Ez{ Ez_() };
 
     double const dt_local{ dt() };
+    double const inv_dx{ 1.0 / dx() };
+    double const inv_dy{ 1.0 / dy() };
+    double const inv_dz{ 1.0 / dz() };
 
-    #pragma omp parallel for collapse( 2 )
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
+
+    std::size_t const Sx{ 1 };
+    std::size_t const Sy{ Nx() };
+    std::size_t const Sz{ Nx() * Ny() };
+
+    #pragma omp parallel for collapse( 2 ) schedule( static )
     // Start at 0; stagger for Yee-Cell grid.
-    for ( std::size_t z = 0; z < Nz() - 1; ++z ) {
-        for ( std::size_t y = 0; y < Ny() - 1; ++y ) {
+    for ( std::size_t z = 0; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 0; y < Ny_local - 1; ++y ) {
             #pragma omp simd
-            for ( std::size_t x = 0; x < Nx() - 1; ++x ) {
-                std::size_t const i{ idx(x,y,z) };
+            for ( std::size_t x = 0; x < Nx_local - 1; ++x ) {
+                std::size_t const i{ x + y*Sy + z*Sz };
+                std::size_t const ix{ i + Sx };
+                std::size_t const iy{ i + Sy };
+                std::size_t const iz{ i + Sz };
 
                 // Take curl of components and apply B -= ∂B:
-                double const curl_x_E{ curl_x( Ey[i], Ey[idx(x,y,z+1)], Ez[i], Ez[idx(x,y+1,z)] ) };
-                double const curl_y_E{ curl_y( Ex[i], Ex[idx(x,y,z+1)], Ez[i], Ez[idx(x+1,y,z)] ) };
-                double const curl_z_E{ curl_z( Ey[i], Ey[idx(x+1,y,z)], Ex[i], Ex[idx(x,y+1,z)] ) };
+                double const curl_x_E{ 
+                    ( Ez[iy] - Ez[i] ) * inv_dy
+                  - ( Ey[iz] - Ey[i] ) * inv_dz
+                 };
+
+                double const curl_y_E{ 
+                    ( Ex[iz] - Ex[i] ) * inv_dz
+                  - ( Ez[ix] - Ez[i] ) * inv_dx
+                };
+
+                double const curl_z_E{ 
+                    ( Ey[ix] - Ey[i] ) * inv_dx
+                  - ( Ex[iy] - Ex[i] ) * inv_dy
+                };
 
                 // ∂B_x = ∂t * curl_x( E )
                 Bx[i] -= dt_local * curl_x_E;
@@ -96,21 +121,47 @@ void Grid::update_E() {
     double* RESTRICT Jz{ Jz_() };
 
     double const dt_local{ dt() };
-    double const inv_eps{ 1.0 / eps() };
     double const c_sq_local{ c_sq() };
+    double const inv_eps{ 1.0 / eps() };
+    double const inv_dx{ 1.0 / dx() };
+    double const inv_dy{ 1.0 / dy() };
+    double const inv_dz{ 1.0 / dz() };
 
-    #pragma omp parallel for collapse( 2 )
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
+
+    std::size_t const Sx{ 1 };
+    std::size_t const Sy{ Nx() };
+    std::size_t const Sz{ Nx() * Ny() };
+
+    #pragma omp parallel for collapse( 2 ) schedule( static )
     // Start at 1; stagger for Yee-Cell grid.
-    for ( std::size_t z = 1; z < Nz(); ++z ) {
-        for ( std::size_t y = 1; y < Ny(); ++y ) {
+    for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
+
             #pragma omp simd
-            for ( std::size_t x = 1; x < Nx(); ++x ) {
-                std::size_t const i{ idx(x,y,z) };
+            for ( std::size_t x = 1; x < Nx_local - 1; ++x ) {
+                std::size_t const i{ x + y*Sy + z*Sz };
+                std::size_t const ix{ i - Sx };
+                std::size_t const iy{ i - Sy };
+                std::size_t const iz{ i - Sz };
 
                 // Curl of components and apply E += ∂E:
-                double const curl_x_B{ curl_x( By[idx(x,y,z-1)], By[i], Bz[idx(x,y-1,z)], Bz[i] ) };
-                double const curl_y_B{ curl_y( Bx[idx(x,y,z-1)], Bx[i], Bz[idx(x-1,y,z)], Bz[i] ) };
-                double const curl_z_B{ curl_z( By[idx(x-1,y,z)], By[i], Bx[idx(x,y-1,z)], Bx[i] ) };
+                double const curl_x_B{ 
+                    ( Bz[i] - Bz[iy] ) * inv_dy
+                  - ( By[i] - By[iz] ) * inv_dz
+                };
+
+                double const curl_y_B{ 
+                    ( Bx[i] - Bx[iz] ) * inv_dz
+                  - ( Bz[i] - Bz[ix] ) * inv_dx
+                };
+
+                double const curl_z_B{ 
+                    ( By[i] - By[ix] ) * inv_dx
+                  - ( Bx[i] - Bx[iy] ) * inv_dy
+                };
 
                 double const jx_term{ Jx[i] * inv_eps };
                 double const jy_term{ Jy[i] * inv_eps };
