@@ -16,13 +16,18 @@ Plane_Wave_Test::Plane_Wave_Test( Simulation_Config const &cfg )
 void Plane_Wave_Test::initialize() {
     std::size_t const margin{ grid_.Nx() / 10 };
 
+    double* RESTRICT Ey{ grid_.Ey_() };
+    double* RESTRICT Bz{ grid_.Bz_() };
+
     #pragma omp parallel for collapse( 3 )
     for ( std::size_t z = margin; z < grid_.Nz() - margin; ++z ) {
         for ( std::size_t y = margin; y < grid_.Ny() - margin; ++y ) {
             for ( std::size_t x = margin; x < grid_.Nx() - margin; ++x ) {
                 double const phase{ wavenumber_ * x * grid_.dx() };
-                grid_.Ey( x, y, z ) = std::sin( phase );
-                grid_.Bz( x, y, z ) = std::sin( phase ) / grid_.c();
+                std::size_t const i{ grid_.idx(x,y,z) };
+
+                Ey[i] = std::sin( phase );
+                Bz[i] = std::sin( phase ) / grid_.c();
             }
         }
     }
@@ -41,8 +46,10 @@ Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
     double total_phase_error{};
 
     for ( std::size_t t = 0; t < num_steps; ++t ) {
+        std::size_t const i{ grid_.idx(probe_x_, probe_y_, probe_z_) };
+
         double const expected_Ey{ std::sin( initial_phase_ - phase_shift_per_step_ * t ) };
-        double const actual_Ey{ grid_.Ey( probe_x_, probe_y_, probe_z_ ) };
+        double const actual_Ey{ grid_.Ey_()[i] };
 
         sum_expected += expected_Ey;
         sum_actual += actual_Ey;

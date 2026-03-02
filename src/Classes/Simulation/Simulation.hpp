@@ -10,6 +10,9 @@ class Output;
 class Simulation_Config;
 
 class Simulation {
+private:
+    void print_progress( double const current, double const total ) const;
+    
 public:
     Simulation_Config config_;
     Grid grid_;

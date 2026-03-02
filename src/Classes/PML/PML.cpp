@@ -197,10 +197,11 @@ void PML::update_B_psi( double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRI
     }
 }
 
-void PML::update_E_psi( double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
-                        double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
-                        double const dt, double const dx, double const dy, double const dz,
-                        double const c_sq ) {
+void PML::update_E_psi(
+    double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
+    double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
+    double const dt, double const dx, double const dy, double const dz,
+    double const c_sq ) {
     if ( !is_active() ) return;
 
     std::size_t const t{ thickness_ };

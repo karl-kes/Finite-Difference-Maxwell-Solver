@@ -12,6 +12,7 @@ Grid::Grid( Simulation_Config const &config )
 : Nx_{ config.Nx + 1 }
 , Ny_{ config.Ny + 1 }
 , Nz_{ config.Nz + 1 }
+, N_{ Nx_*Ny_*Nz_ }
 , dx_{ config.dx }
 , dy_{ config.dy }
 , dz_{ config.dz }
@@ -21,13 +22,8 @@ Grid::Grid( Simulation_Config const &config )
 , c_sq_{ config.c * config.c }
 , dt_{ config.dt }
 , pml_{ config } {
-    auto allocate = [size = config.size]() {
-        return std::make_unique<double[]>( size );
-    };
-
-    Ex_ = allocate(); Ey_ = allocate(); Ez_ = allocate();
-    Bx_ = allocate(); By_ = allocate(); Bz_ = allocate();
-    Jx_ = allocate(); Jy_ = allocate(); Jz_ = allocate();
+    std::size_t const size{ N_*num_vec_components_ };
+    memory_block_ = std::make_unique<double[]>( size );
 }
 
 void Grid::add_source( std::unique_ptr<Source> source ) {
@@ -43,12 +39,13 @@ void Grid::apply_sources( double const time_step ) {
 void Grid::update_B() {
     // ∂B/∂t = -curl( E )
 
-    double* RESTRICT Bx{ Bx_.get() };
-    double* RESTRICT By{ By_.get() };
-    double* RESTRICT Bz{ Bz_.get() };
-    double* RESTRICT Ex{ Ex_.get() };
-    double* RESTRICT Ey{ Ey_.get() };
-    double* RESTRICT Ez{ Ez_.get() };
+    double* RESTRICT Bx{ Bx_() };
+    double* RESTRICT By{ By_() };
+    double* RESTRICT Bz{ Bz_() };
+
+    double* RESTRICT Ex{ Ex_() };
+    double* RESTRICT Ey{ Ey_() };
+    double* RESTRICT Ez{ Ez_() };
 
     double const dt_local{ dt() };
 
@@ -76,23 +73,27 @@ void Grid::update_B() {
             }
         }
     }
-    pml_.update_B_psi( Ex_.get(), Ey_.get(), Ez_.get(),
-                       Bx_.get(), By_.get(), Bz_.get(),
-                       dt(), dx(), dy(), dz() );
+    pml_.update_B_psi(
+        Ex_(), Ey_(), Ez_(),
+        Bx_(), By_(), Bz_(),
+        dt(), dx(), dy(), dz()
+    );
 }
 
 void Grid::update_E() {
     // ∂E/∂t = c*c * curl(B)
 
-    double* RESTRICT Bx{ Bx_.get() };
-    double* RESTRICT By{ By_.get() };
-    double* RESTRICT Bz{ Bz_.get() };
-    double* RESTRICT Ex{ Ex_.get() };
-    double* RESTRICT Ey{ Ey_.get() };
-    double* RESTRICT Ez{ Ez_.get() };
-    double* RESTRICT Jx{ Jx_.get() };
-    double* RESTRICT Jy{ Jy_.get() };
-    double* RESTRICT Jz{ Jz_.get() };
+    double* RESTRICT Bx{ Bx_() };
+    double* RESTRICT By{ By_() };
+    double* RESTRICT Bz{ Bz_() };
+    
+    double* RESTRICT Ex{ Ex_() };
+    double* RESTRICT Ey{ Ey_() };
+    double* RESTRICT Ez{ Ez_() };
+
+    double* RESTRICT Jx{ Jx_() };
+    double* RESTRICT Jy{ Jy_() };
+    double* RESTRICT Jz{ Jz_() };
 
     double const dt_local{ dt() };
     double const inv_eps{ 1.0 / eps() };
@@ -126,9 +127,11 @@ void Grid::update_E() {
             }
         }
     }
-    pml_.update_E_psi( Ex_.get(), Ey_.get(), Ez_.get(),
-                       Bx_.get(), By_.get(), Bz_.get(),
-                       dt(), dx(), dy(), dz(), c_sq() );
+    pml_.update_E_psi(
+        Ex_(), Ey_(), Ez_(),
+        Bx_(), By_(), Bz_(),
+        dt(), dx(), dy(), dz(), c_sq()
+    );
 }
 
 void Grid::step() {
@@ -140,17 +143,18 @@ double Grid::field(
     Field const field,
     Component const component,
     std::size_t const x, std::size_t const y, std::size_t const z ) const {
+    std::size_t const i{ idx(x,y,z) };
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
-            case Component::X: return Ex(x,y,z);
-            case Component::Y: return Ey(x,y,z);
-            case Component::Z: return Ez(x,y,z);
+            case Component::X: return Ex_()[i];
+            case Component::Y: return Ey_()[i];
+            case Component::Z: return Ez_()[i];
         }
     } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case Component::X: return Bx(x,y,z);
-            case Component::Y: return By(x,y,z);
-            case Component::Z: return Bz(x,y,z);
+            case Component::X: return Bx_()[i];
+            case Component::Y: return By_()[i];
+            case Component::Z: return Bz_()[i];
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
@@ -160,17 +164,18 @@ double &Grid::field(
     Field const field,
     Component const component,
     std::size_t const x, std::size_t const y, std::size_t const z ) {
+    std::size_t const i{ idx(x,y,z) };
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
-            case Component::X: return Ex(x,y,z);
-            case Component::Y: return Ey(x,y,z);
-            case Component::Z: return Ez(x,y,z);
+            case Component::X: return Ex_()[i];
+            case Component::Y: return Ey_()[i];
+            case Component::Z: return Ez_()[i];
         }
     } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case Component::X: return Bx(x,y,z);
-            case Component::Y: return By(x,y,z);
-            case Component::Z: return Bz(x,y,z);
+            case Component::X: return Bx_()[i];
+            case Component::Y: return By_()[i];
+            case Component::Z: return Bz_()[i];
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
@@ -190,12 +195,12 @@ double Grid::total_energy() const {
     double energy{};
     double const dV{ dx() * dy() * dz() };
 
-    double* RESTRICT Ex{ Ex_.get() };
-    double* RESTRICT Ey{ Ey_.get() };
-    double* RESTRICT Ez{ Ez_.get() };
-    double* RESTRICT Bx{ Bx_.get() };
-    double* RESTRICT By{ By_.get() };
-    double* RESTRICT Bz{ Bz_.get() };
+    double const* RESTRICT Ex{ Ex_() };
+    double const* RESTRICT Ey{ Ey_() };
+    double const* RESTRICT Ez{ Ez_() };
+    double const* RESTRICT Bx{ Bx_() };
+    double const* RESTRICT By{ By_() };
+    double const* RESTRICT Bz{ Bz_() };
 
     double const inv_mu{ 1.0 / mu() };
     double const eps_local{ eps() };
@@ -220,12 +225,12 @@ double Grid::source_power() const {
     double power{};
     double const dV{ dx() * dy() * dz() };
 
-    double* RESTRICT Ex{ Ex_.get() };
-    double* RESTRICT Ey{ Ey_.get() };
-    double* RESTRICT Ez{ Ez_.get() };
-    double* RESTRICT Jx{ Jx_.get() };
-    double* RESTRICT Jy{ Jy_.get() };
-    double* RESTRICT Jz{ Jz_.get() };
+    double const* RESTRICT Ex{ Ex_() };
+    double const* RESTRICT Ey{ Ey_() };
+    double const* RESTRICT Ez{ Ez_() };
+    double const* RESTRICT Jx{ Jx_() };
+    double const* RESTRICT Jy{ Jy_() };
+    double const* RESTRICT Jz{ Jz_() };
     
     #pragma omp parallel for collapse( 3 ) reduction( +:power )
     for ( std::size_t z = 0; z < Nz(); ++z ) {

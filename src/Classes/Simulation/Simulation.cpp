@@ -6,6 +6,11 @@ Simulation::Simulation( Simulation_Config const &new_config )
 , output_{ "output" }
 { }
 
+void Simulation::print_progress( double const current, double const total ) const {
+    double const percent{ 100.0 * current / total };
+    std::cout << "\rProgress: " << percent << "%" << std::flush;
+}
+
 void Simulation::initialize() {
     output_.initialize();
 
@@ -54,7 +59,7 @@ void Simulation::run() {
 
         if ( ( curr_time % config_.output_interval() ) == 0 ) {
             output_.write_field( grid_, curr_time );
-            grid_.print_progress( curr_time, config_.total_time );
+            print_progress( curr_time, config_.total_time );
         }
     }
 
