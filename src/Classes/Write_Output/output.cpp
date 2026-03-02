@@ -24,13 +24,13 @@ void Output::write_field( Grid const& grid, double const time_step ) const {
     std::vector<double> buffer;
     buffer.reserve( nx * ny * 4 );
 
-    double const* RESTRICT Ex{ grid.Ex_() };
-    double const* RESTRICT Ey{ grid.Ey_() };
-    double const* RESTRICT Ez{ grid.Ez_() };
+    double const* RESTRICT Ex{ grid.Ex_ptr() };
+    double const* RESTRICT Ey{ grid.Ey_ptr() };
+    double const* RESTRICT Ez{ grid.Ez_ptr() };
 
-    double const* RESTRICT Bx{ grid.Bx_() };
-    double const* RESTRICT By{ grid.By_() };
-    double const* RESTRICT Bz{ grid.Bz_() };
+    double const* RESTRICT Bx{ grid.Bx_ptr() };
+    double const* RESTRICT By{ grid.By_ptr() };
+    double const* RESTRICT Bz{ grid.Bz_ptr() };
 
 
     for ( std::size_t z = 0; z < nz; ++z ) {

@@ -39,13 +39,13 @@ void Grid::apply_sources( double const time_step ) {
 void Grid::update_B() {
     // ∂B/∂t = -curl( E )
 
-    double* RESTRICT Bx{ Bx_() };
-    double* RESTRICT By{ By_() };
-    double* RESTRICT Bz{ Bz_() };
+    double* RESTRICT Bx{ Bx_ptr() };
+    double* RESTRICT By{ By_ptr() };
+    double* RESTRICT Bz{ Bz_ptr() };
 
-    double* RESTRICT Ex{ Ex_() };
-    double* RESTRICT Ey{ Ey_() };
-    double* RESTRICT Ez{ Ez_() };
+    double* RESTRICT Ex{ Ex_ptr() };
+    double* RESTRICT Ey{ Ey_ptr() };
+    double* RESTRICT Ez{ Ez_ptr() };
 
     double const dt_local{ dt() };
     double const inv_dx{ 1.0 / dx() };
@@ -99,8 +99,8 @@ void Grid::update_B() {
         }
     }
     pml_.update_B_psi(
-        Ex_(), Ey_(), Ez_(),
-        Bx_(), By_(), Bz_(),
+        Ex_ptr(), Ey_ptr(), Ez_ptr(),
+        Bx_ptr(), By_ptr(), Bz_ptr(),
         dt(), dx(), dy(), dz()
     );
 }
@@ -108,17 +108,17 @@ void Grid::update_B() {
 void Grid::update_E() {
     // ∂E/∂t = c*c * curl(B)
 
-    double* RESTRICT Bx{ Bx_() };
-    double* RESTRICT By{ By_() };
-    double* RESTRICT Bz{ Bz_() };
+    double* RESTRICT Bx{ Bx_ptr() };
+    double* RESTRICT By{ By_ptr() };
+    double* RESTRICT Bz{ Bz_ptr() };
     
-    double* RESTRICT Ex{ Ex_() };
-    double* RESTRICT Ey{ Ey_() };
-    double* RESTRICT Ez{ Ez_() };
+    double* RESTRICT Ex{ Ex_ptr() };
+    double* RESTRICT Ey{ Ey_ptr() };
+    double* RESTRICT Ez{ Ez_ptr() };
 
-    double* RESTRICT Jx{ Jx_() };
-    double* RESTRICT Jy{ Jy_() };
-    double* RESTRICT Jz{ Jz_() };
+    double* RESTRICT Jx{ Jx_ptr() };
+    double* RESTRICT Jy{ Jy_ptr() };
+    double* RESTRICT Jz{ Jz_ptr() };
 
     double const dt_local{ dt() };
     double const c_sq_local{ c_sq() };
@@ -179,8 +179,8 @@ void Grid::update_E() {
         }
     }
     pml_.update_E_psi(
-        Ex_(), Ey_(), Ez_(),
-        Bx_(), By_(), Bz_(),
+        Ex_ptr(), Ey_ptr(), Ez_ptr(),
+        Bx_ptr(), By_ptr(), Bz_ptr(),
         dt(), dx(), dy(), dz(), c_sq()
     );
 }
@@ -197,15 +197,15 @@ double Grid::field(
     std::size_t const i{ idx(x,y,z) };
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
-            case Component::X: return Ex_()[i];
-            case Component::Y: return Ey_()[i];
-            case Component::Z: return Ez_()[i];
+            case Component::X: return Ex_ptr()[i];
+            case Component::Y: return Ey_ptr()[i];
+            case Component::Z: return Ez_ptr()[i];
         }
     } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case Component::X: return Bx_()[i];
-            case Component::Y: return By_()[i];
-            case Component::Z: return Bz_()[i];
+            case Component::X: return Bx_ptr()[i];
+            case Component::Y: return By_ptr()[i];
+            case Component::Z: return Bz_ptr()[i];
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
@@ -218,15 +218,15 @@ double &Grid::field(
     std::size_t const i{ idx(x,y,z) };
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
-            case Component::X: return Ex_()[i];
-            case Component::Y: return Ey_()[i];
-            case Component::Z: return Ez_()[i];
+            case Component::X: return Ex_ptr()[i];
+            case Component::Y: return Ey_ptr()[i];
+            case Component::Z: return Ez_ptr()[i];
         }
     } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case Component::X: return Bx_()[i];
-            case Component::Y: return By_()[i];
-            case Component::Z: return Bz_()[i];
+            case Component::X: return Bx_ptr()[i];
+            case Component::Y: return By_ptr()[i];
+            case Component::Z: return Bz_ptr()[i];
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
@@ -246,12 +246,12 @@ double Grid::total_energy() const {
     double energy{};
     double const dV{ dx() * dy() * dz() };
 
-    double const* RESTRICT Ex{ Ex_() };
-    double const* RESTRICT Ey{ Ey_() };
-    double const* RESTRICT Ez{ Ez_() };
-    double const* RESTRICT Bx{ Bx_() };
-    double const* RESTRICT By{ By_() };
-    double const* RESTRICT Bz{ Bz_() };
+    double const* RESTRICT Ex{ Ex_ptr() };
+    double const* RESTRICT Ey{ Ey_ptr() };
+    double const* RESTRICT Ez{ Ez_ptr() };
+    double const* RESTRICT Bx{ Bx_ptr() };
+    double const* RESTRICT By{ By_ptr() };
+    double const* RESTRICT Bz{ Bz_ptr() };
 
     double const inv_mu{ 1.0 / mu() };
     double const eps_local{ eps() };
@@ -276,12 +276,12 @@ double Grid::source_power() const {
     double power{};
     double const dV{ dx() * dy() * dz() };
 
-    double const* RESTRICT Ex{ Ex_() };
-    double const* RESTRICT Ey{ Ey_() };
-    double const* RESTRICT Ez{ Ez_() };
-    double const* RESTRICT Jx{ Jx_() };
-    double const* RESTRICT Jy{ Jy_() };
-    double const* RESTRICT Jz{ Jz_() };
+    double const* RESTRICT Ex{ Ex_ptr() };
+    double const* RESTRICT Ey{ Ey_ptr() };
+    double const* RESTRICT Ez{ Ez_ptr() };
+    double const* RESTRICT Jx{ Jx_ptr() };
+    double const* RESTRICT Jy{ Jy_ptr() };
+    double const* RESTRICT Jz{ Jz_ptr() };
     
     #pragma omp parallel for collapse( 3 ) reduction( +:power )
     for ( std::size_t z = 0; z < Nz(); ++z ) {

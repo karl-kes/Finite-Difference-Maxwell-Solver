@@ -100,31 +100,31 @@ public:
 
     // Raw Pointer Field Components:
     // Mutable:
-    [[nodiscard]] double* Ex_() { return memory_block_.get(); }
-    [[nodiscard]] double* Ey_() { return memory_block_.get() + N_; }
-    [[nodiscard]] double* Ez_() { return memory_block_.get() + 2*N_; }
+    [[nodiscard]] double* Ex_ptr() { return memory_block_.get(); }
+    [[nodiscard]] double* Ey_ptr() { return memory_block_.get() + N_; }
+    [[nodiscard]] double* Ez_ptr() { return memory_block_.get() + 2*N_; }
 
-    [[nodiscard]] double* Bx_() { return memory_block_.get() + 3*N_; }
-    [[nodiscard]] double* By_() { return memory_block_.get() + 4*N_; }
-    [[nodiscard]] double* Bz_() { return memory_block_.get() + 5*N_; }
+    [[nodiscard]] double* Bx_ptr() { return memory_block_.get() + 3*N_; }
+    [[nodiscard]] double* By_ptr() { return memory_block_.get() + 4*N_; }
+    [[nodiscard]] double* Bz_ptr() { return memory_block_.get() + 5*N_; }
 
-    [[nodiscard]] double* Jx_() { return memory_block_.get() + 6*N_; }
-    [[nodiscard]] double* Jy_() { return memory_block_.get() + 7*N_; }
-    [[nodiscard]] double* Jz_() { return memory_block_.get() + 8*N_; }
+    [[nodiscard]] double* Jx_ptr() { return memory_block_.get() + 6*N_; }
+    [[nodiscard]] double* Jy_ptr() { return memory_block_.get() + 7*N_; }
+    [[nodiscard]] double* Jz_ptr() { return memory_block_.get() + 8*N_; }
 
     // Raw Pointer Field Components:
     // Immutable:
-    [[nodiscard]] double const* Ex_() const { return memory_block_.get(); }
-    [[nodiscard]] double const* Ey_() const { return memory_block_.get() + N_; }
-    [[nodiscard]] double const* Ez_() const { return memory_block_.get() + 2*N_; }
+    [[nodiscard]] double const* Ex_ptr() const { return memory_block_.get(); }
+    [[nodiscard]] double const* Ey_ptr() const { return memory_block_.get() + N_; }
+    [[nodiscard]] double const* Ez_ptr() const { return memory_block_.get() + 2*N_; }
 
-    [[nodiscard]] double const* Bx_() const { return memory_block_.get() + 3*N_; }
-    [[nodiscard]] double const* By_() const { return memory_block_.get() + 4*N_; }
-    [[nodiscard]] double const* Bz_() const { return memory_block_.get() + 5*N_; }
+    [[nodiscard]] double const* Bx_ptr() const { return memory_block_.get() + 3*N_; }
+    [[nodiscard]] double const* By_ptr() const { return memory_block_.get() + 4*N_; }
+    [[nodiscard]] double const* Bz_ptr() const { return memory_block_.get() + 5*N_; }
 
-    [[nodiscard]] double const* Jx_() const { return memory_block_.get() + 6*N_; }
-    [[nodiscard]] double const* Jy_() const { return memory_block_.get() + 7*N_; }
-    [[nodiscard]] double const* Jz_() const { return memory_block_.get() + 8*N_; }
+    [[nodiscard]] double const* Jx_ptr() const { return memory_block_.get() + 6*N_; }
+    [[nodiscard]] double const* Jy_ptr() const { return memory_block_.get() + 7*N_; }
+    [[nodiscard]] double const* Jz_ptr() const { return memory_block_.get() + 8*N_; }
 
     // Diagnostics:
     [[nodiscard]] double total_energy() const;

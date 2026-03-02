@@ -5,7 +5,7 @@ void Straight_Wire_X::apply( Grid &grid, double const time_step ) {
     double const omega{ 2.0 * config::PI * frequency_ };
     double const current{ amplitude_ * std::sin( omega * time_step * grid.dt() ) };
 
-    double* RESTRICT Jx{ grid.Jx_() };
+    double* RESTRICT Jx{ grid.Jx_ptr() };
 
     for ( std::size_t x{ x_start_ }; x <= x_end_; ++x ) {
         std::size_t const i{ grid.idx(x,y_,z_) };
@@ -17,9 +17,9 @@ void Point_Source::apply( Grid &grid, double const time_step ) {
     ( void )time_step;
     std::size_t const i{ grid.idx(x_,y_,z_) };
 
-    double* RESTRICT Jx{ grid.Jx_() };
-    double* RESTRICT Jy{ grid.Jy_() };
-    double* RESTRICT Jz{ grid.Jz_() };
+    double* RESTRICT Jx{ grid.Jx_ptr() };
+    double* RESTRICT Jy{ grid.Jy_ptr() };
+    double* RESTRICT Jz{ grid.Jz_ptr() };
 
     Jx[i] = value_;
     Jy[i] = value_;
@@ -32,7 +32,7 @@ void Gaussian_Pulse::apply( Grid& grid, double const time_step ) {
     };
     std::size_t const i{ grid.idx(x_,y_,z_) };
 
-    double* RESTRICT Jz{ grid.Jz_() };
+    double* RESTRICT Jz{ grid.Jz_ptr() };
     
     Jz[i] = amplitude_ * std::exp( exponent );
 }
