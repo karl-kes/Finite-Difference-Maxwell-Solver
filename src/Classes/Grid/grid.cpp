@@ -1,5 +1,12 @@
 #include "grid.hpp"
 
+#include "../Source/source.hpp"
+
+#include <cmath>
+#include <stdexcept>
+#include <omp.h>
+#include <utility>
+
 #if defined(__GNUC__) || defined(__clang__)
     #define RESTRICT __restrict__
 #elif defined(_MSC_VER)
@@ -25,6 +32,8 @@ Grid::Grid( Simulation_Config const &config )
     std::size_t const size{ N_*num_vec_components_ };
     memory_block_ = std::make_unique<double[]>( size );
 }
+
+Grid::~Grid() = default;
 
 void Grid::add_source( std::unique_ptr<Source> source ) {
     sources_.push_back( std::move( source ) );

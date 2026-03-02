@@ -2,14 +2,12 @@
 
 #include <memory>
 #include <vector>
-#include <cmath>
-#include <stdexcept>
-#include <omp.h>
+#include <cstddef>
 
 #include "../Config/config.hpp"
-#include "../Source/source.hpp"
-#include "../Write_Output/output.hpp"
 #include "../PML/PML.hpp"
+
+class Source;
 
 class Grid {
 private:
@@ -48,6 +46,7 @@ private:
 public:
     // Constructor:
     explicit Grid( Simulation_Config const &config );
+    ~Grid();
 
     // System Simulation:
     void step();

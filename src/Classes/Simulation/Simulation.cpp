@@ -1,5 +1,12 @@
 #include "Simulation.hpp"
 
+#include "../Source/source.hpp"
+
+#include <iostream>
+#include <chrono>
+#include <memory>
+#include <cstddef>
+
 Simulation::Simulation( Simulation_Config const &new_config )
 : config_{ new_config }
 , grid_{ config_ }

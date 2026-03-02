@@ -1,6 +1,8 @@
 #pragma once
 
-#include "../Config/config.hpp"
+#include "../Grid/grid.hpp"
+
+#include <cstddef>
 
 class Grid;
 

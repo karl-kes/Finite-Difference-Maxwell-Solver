@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <cmath>
+#include <cstddef>
 
 #if defined(__GNUC__) || defined(__clang__)
     #define RESTRICT __restrict__

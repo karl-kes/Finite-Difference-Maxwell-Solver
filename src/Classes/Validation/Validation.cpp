@@ -1,11 +1,26 @@
 #include "Validation.hpp"
 
+#include <numbers>
+#include <cmath>
+#include <iostream>
+#include <iomanip>
+#include <algorithm>
+
+#if defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#elif defined(_MSC_VER)
+    #define RESTRICT __restrict
+#else
+    #define RESTRICT
+#endif
+
+
 Plane_Wave_Test::Plane_Wave_Test( Simulation_Config const &cfg )
 : config_{ cfg }
 , grid_{ config_ }
 , output_{ "validation_output" }
 , wavelength_{ compute_wavelength( grid_, config_ ) }
-, wavenumber_{ 2.0 * config::PI / wavelength_ }
+, wavenumber_{ 2.0 * std::numbers::pi / wavelength_ }
 , probe_x_{ grid_.Nx() / 2 }
 , probe_y_{ grid_.Ny() / 2 }
 , probe_z_{ grid_.Nz() / 2 }

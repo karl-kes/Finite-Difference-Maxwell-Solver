@@ -2,12 +2,7 @@
 
 #include "../Config/config.hpp"
 #include "../Grid/grid.hpp"
-#include "../Source/source.hpp"
 #include "../Write_Output/output.hpp"
-#include "../PML/PML.hpp"
-
-class Output;
-class Simulation_Config;
 
 class Simulation {
 private:

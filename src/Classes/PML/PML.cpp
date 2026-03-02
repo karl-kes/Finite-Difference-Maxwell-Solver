@@ -1,5 +1,7 @@
 #include "PML.hpp"
 
+#include <omp.h>
+
 PML::PML( Simulation_Config const &config )
 : thickness_{ config.use_pml ? config.pml_thickness : 0 }
 , Nx_{ config.Nx + 1 }

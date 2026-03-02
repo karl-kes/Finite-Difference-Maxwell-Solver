@@ -2,6 +2,9 @@
 
 #include "../Config/config.hpp"
 
+#include <filesystem>
+#include <string>
+
 class Grid;
 
 class Output {

@@ -1,5 +1,20 @@
-#include "../Grid/grid.hpp"
 #include "output.hpp"
+
+#include "../Grid/grid.hpp"
+
+#include <fstream>
+#include <stdexcept>
+#include <cstdint>
+#include <vector>
+#include <cmath>
+
+#if defined(__GNUC__) || defined(__clang__)
+    #define RESTRICT __restrict__
+#elif defined(_MSC_VER)
+    #define RESTRICT __restrict
+#else
+    #define RESTRICT
+#endif
 
 void Output::write_field( Grid const& grid, double const time_step ) const {
     // Electric:

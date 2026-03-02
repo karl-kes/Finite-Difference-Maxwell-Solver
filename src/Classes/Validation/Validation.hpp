@@ -4,9 +4,7 @@
 #include "../Grid/grid.hpp"
 #include "../Write_Output/output.hpp"
 
-#include <cmath>
-#include <iostream>
-#include <iomanip>
+#include <cstddef>
 
 struct Validation_Result {
     bool passed;
