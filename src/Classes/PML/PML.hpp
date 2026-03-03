@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Config/config.hpp"
+#include "../Config/memory.hpp"
 
 #include <memory>
 #include <cmath>
@@ -16,11 +17,18 @@
 
 class PML {
 private:
+    // Alignment constant:
+    static constexpr std::size_t num_coeff_arrays_{ 18 };
+    static constexpr std::size_t alignment_bytes_{ 64 };
+    static constexpr std::size_t doubles_per_alignment_{ 8 };
+
     // PML Region Size:
     std::size_t thickness_;
+    std::size_t thickness_padded_;
 
     // Grid Dimensions:
     std::size_t Nx_, Ny_, Nz_;
+    std::size_t Nx_padded_, Ny_padded_, Nz_padded_;
 
     // Grading Parameters:
     int order_;
@@ -29,20 +37,7 @@ private:
     double alpha_max_;
 
     // CPML Coefficients:
-    // x-direction:
-    std::unique_ptr<double[]> b_Ex_, c_Ex_;     // E-field half-grid
-    std::unique_ptr<double[]> b_Bx_, c_Bx_;     // B-field half-grid
-    std::unique_ptr<double[]> kappa_Ex_, kappa_Bx_;
-
-    // y-direction:
-    std::unique_ptr<double[]> b_Ey_, c_Ey_;
-    std::unique_ptr<double[]> b_By_, c_By_;
-    std::unique_ptr<double[]> kappa_Ey_, kappa_By_;
-
-    // z-direction:
-    std::unique_ptr<double[]> b_Ez_, c_Ez_;
-    std::unique_ptr<double[]> b_Bz_, c_Bz_;
-    std::unique_ptr<double[]> kappa_Ez_, kappa_Bz_;
+    std::unique_ptr<double[], AlignedDeleter> coeff_memory_block_;
 
     // Psi (Auxiliary Convolution) Arrays:
     // E-field corrections:
@@ -62,9 +57,11 @@ private:
     [[nodiscard]] double alpha( double const depth_norm ) const { return alpha_max_ * ( 1.0 - depth_norm ); }
 
     // Compute b and c coefficients from grading values:
-    void compute_coefficients( double const sigma_val, double const kappa_val, double const alpha_val,
-                               double const dt, double const eps,
-                               double &b_out, double &c_out ) const {
+    void compute_coefficients( 
+        double const sigma_val, double const kappa_val, double const alpha_val,
+        double const dt, double const eps,
+        double &b_out, double &c_out
+    ) const {
         double const denom{ kappa_val * ( sigma_val + kappa_val * alpha_val ) };
         b_out = std::exp( -( sigma_val / kappa_val + alpha_val ) * dt / eps );
         c_out = ( denom > 1e-20 ) ? ( sigma_val / denom ) * ( b_out - 1.0 ) : 0.0;
@@ -86,27 +83,80 @@ public:
     explicit PML( Simulation_Config const &config );
 
     // Apply PML corrections after standard update:
-    void update_B_psi( double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
-                       double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
-                       double const dt, double const dx, double const dy, double const dz );
+    void update_B_psi(
+        double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
+        double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
+        double const dt, double const dx, double const dy, double const dz
+    );
 
-    void update_E_psi( double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
-                       double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
-                       double const dt, double const dx, double const dy, double const dz,
-                       double const c_sq );
+    void update_E_psi(
+        double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
+        double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
+        double const dt, double const dx, double const dy, double const dz,
+        double const c_sq
+    );
 
     // Getters:
     [[nodiscard]] std::size_t thickness() const { return thickness_; }
+    [[nodiscard]] std::size_t thickness_padded() const { return thickness_padded_; }
     [[nodiscard]] bool is_active() const { return thickness_ > 0; }
 
-    // Kappa accessors for modified curl in interior:
-    [[nodiscard]] double const* kappa_Ex() const { return kappa_Ex_.get(); }
-    [[nodiscard]] double const* kappa_Bx() const { return kappa_Bx_.get(); }
-    [[nodiscard]] double const* kappa_Ey() const { return kappa_Ey_.get(); }
-    [[nodiscard]] double const* kappa_By() const { return kappa_By_.get(); }
-    [[nodiscard]] double const* kappa_Ez() const { return kappa_Ez_.get(); }
-    [[nodiscard]] double const* kappa_Bz() const { return kappa_Bz_.get(); }
+    // Raw Pointer Coefficient Access - Mutable
+    [[nodiscard]] double* b_Ex_ptr() { return coeff_memory_block_.get(); }
+    [[nodiscard]] double* c_Ex_ptr() { return coeff_memory_block_.get() + 1 * thickness_padded(); }
+    [[nodiscard]] double* kappa_Ex_ptr() { return coeff_memory_block_.get() + 2 * thickness_padded(); }
+
+    [[nodiscard]] double* b_Bx_ptr() { return coeff_memory_block_.get() + 3 * thickness_padded(); }
+    [[nodiscard]] double* c_Bx_ptr() { return coeff_memory_block_.get() + 4 * thickness_padded(); }
+    [[nodiscard]] double* kappa_Bx_ptr() { return coeff_memory_block_.get() + 5 * thickness_padded(); }
+
+    [[nodiscard]] double* b_Ey_ptr() { return coeff_memory_block_.get() + 6 * thickness_padded(); }
+    [[nodiscard]] double* c_Ey_ptr() { return coeff_memory_block_.get() + 7 * thickness_padded(); }
+    [[nodiscard]] double* kappa_Ey_ptr() { return coeff_memory_block_.get() + 8 * thickness_padded(); }
+
+    [[nodiscard]] double* b_By_ptr() { return coeff_memory_block_.get() + 9 * thickness_padded(); }
+    [[nodiscard]] double* c_By_ptr() { return coeff_memory_block_.get() + 10 * thickness_padded(); }
+    [[nodiscard]] double* kappa_By_ptr() { return coeff_memory_block_.get() + 11 * thickness_padded(); }
+
+    [[nodiscard]] double* b_Ez_ptr() { return coeff_memory_block_.get() + 12 * thickness_padded(); }
+    [[nodiscard]] double* c_Ez_ptr() { return coeff_memory_block_.get() + 13 * thickness_padded(); }
+    [[nodiscard]] double* kappa_Ez_ptr() { return coeff_memory_block_.get() + 14 * thickness_padded(); }
+
+    [[nodiscard]] double* b_Bz_ptr() { return coeff_memory_block_.get() + 15 * thickness_padded(); }
+    [[nodiscard]] double* c_Bz_ptr() { return coeff_memory_block_.get() + 16 * thickness_padded(); }
+    [[nodiscard]] double* kappa_Bz_ptr() { return coeff_memory_block_.get() + 17 * thickness_padded(); }
+
+    // Raw Pointer Coefficient Access - Immutable:
+    [[nodiscard]] double const* b_Ex_ptr() const { return coeff_memory_block_.get(); }
+    [[nodiscard]] double const* c_Ex_ptr() const { return coeff_memory_block_.get() + 1 * thickness_padded(); }
+    [[nodiscard]] double const* kappa_Ex_ptr() const { return coeff_memory_block_.get() + 2 * thickness_padded(); }
+    
+    [[nodiscard]] double const* b_Bx_ptr() const { return coeff_memory_block_.get() + 3 * thickness_padded(); }
+    [[nodiscard]] double const* c_Bx_ptr() const { return coeff_memory_block_.get() + 4 * thickness_padded(); }
+    [[nodiscard]] double const* kappa_Bx_ptr() const { return coeff_memory_block_.get() + 5 * thickness_padded(); }
+
+    [[nodiscard]] double const* b_Ey_ptr() const { return coeff_memory_block_.get() + 6 * thickness_padded(); }
+    [[nodiscard]] double const* c_Ey_ptr() const { return coeff_memory_block_.get() + 7 * thickness_padded(); }
+    [[nodiscard]] double const* kappa_Ey_ptr() const { return coeff_memory_block_.get() + 8 * thickness_padded(); }
+
+    [[nodiscard]] double const* b_By_ptr() const { return coeff_memory_block_.get() + 9 * thickness_padded(); }
+    [[nodiscard]] double const* c_By_ptr() const { return coeff_memory_block_.get() + 10 * thickness_padded(); }
+    [[nodiscard]] double const* kappa_By_ptr() const { return coeff_memory_block_.get() + 11 * thickness_padded(); }
+
+    [[nodiscard]] double const* b_Ez_ptr() const { return coeff_memory_block_.get() + 12 * thickness_padded(); }
+    [[nodiscard]] double const* c_Ez_ptr() const { return coeff_memory_block_.get() + 13 * thickness_padded(); }
+    [[nodiscard]] double const* kappa_Ez_ptr() const { return coeff_memory_block_.get() + 14 * thickness_padded(); }
+
+    [[nodiscard]] double const* b_Bz_ptr() const { return coeff_memory_block_.get() + 15 * thickness_padded(); }
+    [[nodiscard]] double const* c_Bz_ptr() const { return coeff_memory_block_.get() + 16 * thickness_padded(); }
+    [[nodiscard]] double const* kappa_Bz_ptr() const { return coeff_memory_block_.get() + 17 * thickness_padded(); }
 
     // Grid-index helpers for the PML to use the same idx as Grid:
-    [[nodiscard]] std::size_t idx( std::size_t const x, std::size_t const y, std::size_t const z ) const { return x + Nx_ * ( y + Ny_ * z ); }
+    [[nodiscard]] std::size_t idx(
+        std::size_t const x,
+        std::size_t const y,
+        std::size_t const z
+    ) const{
+        return x + Nx_padded_ * ( y + Ny_padded_ * z );
+    }
 };

@@ -19,6 +19,9 @@ Grid::Grid( Simulation_Config const &config )
 : Nx_{ config.Nx + 1 }
 , Ny_{ config.Ny + 1 }
 , Nz_{ config.Nz + 1 }
+, Nx_padded_{ (Nx_ + doubles_per_alignment_ - 1) & ~(doubles_per_alignment_ - 1) }
+, Ny_padded_{ (Ny_ + doubles_per_alignment_ - 1) & ~(doubles_per_alignment_ - 1) }
+, Nz_padded_{ (Nz_ + doubles_per_alignment_ - 1) & ~(doubles_per_alignment_ - 1) }
 , N_{ Nx_*Ny_*Nz_ }
 , dx_{ config.dx }
 , dy_{ config.dy }
@@ -28,9 +31,23 @@ Grid::Grid( Simulation_Config const &config )
 , c_{ config.c }
 , c_sq_{ config.c * config.c }
 , dt_{ config.dt }
+, alignment_padding_{ Nx_padded_ * Ny_padded_ * Nz_padded_ }
 , pml_{ config } {
-    std::size_t const size{ N_*num_vec_components_ };
-    memory_block_ = std::make_unique<double[]>( size );
+    // Round to nearest multiple of 8 - needed to ensure sub-arrays are 64 byte aligned:
+
+    // Determine size of the memory block in bytes:
+    std::size_t const memory_block_size{ num_vec_components_*alignment_padding_ };
+    std::size_t const block_size_bytes{ memory_block_size * sizeof(double) };
+    
+    // 64 byte alignment and allocation:
+    double* ptr = static_cast<double*>(alignedAlloc(alignment_bytes_, block_size_bytes));
+    if (!ptr) { throw std::bad_alloc(); }
+
+    // Zero initialization:
+    std::fill_n(ptr, memory_block_size, 0.0);
+
+    // Pointer owner transfership:
+    memory_block_.reset(ptr);
 }
 
 Grid::~Grid() = default;
@@ -66,8 +83,8 @@ void Grid::update_B() {
     std::size_t const Nz_local{ Nz() };
 
     std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx() };
-    std::size_t const Sz{ Nx() * Ny() };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
     // Start at 0; stagger for Yee-Cell grid.
@@ -141,8 +158,8 @@ void Grid::update_E() {
     std::size_t const Nz_local{ Nz() };
 
     std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx() };
-    std::size_t const Sz{ Nx() * Ny() };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
     // Start at 1; stagger for Yee-Cell grid.
