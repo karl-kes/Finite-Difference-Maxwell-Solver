@@ -33,7 +33,7 @@ Grid::Grid( Simulation_Config const &config )
 , dt_{ config.dt }
 , alignment_padding_{ Nx_padded_ * Ny_padded_ * Nz_padded_ }
 , pml_{ config } {
-    // Round to nearest multiple of 8 - needed to ensure sub-arrays are 64 byte aligned:
+    // Round to nearest multiple of 8 - needed to ensure sub-arrays are byte aligned:
 
     // Determine size of the memory block in bytes:
     std::size_t const memory_block_size{ num_vec_components_*alignment_padding_ };

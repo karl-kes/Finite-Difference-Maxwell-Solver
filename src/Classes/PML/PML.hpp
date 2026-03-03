@@ -19,8 +19,8 @@ class PML {
 private:
     // Alignment constant:
     static constexpr std::size_t num_coeff_arrays_{ 18 };
-    static constexpr std::size_t alignment_bytes_{ 64 };
-    static constexpr std::size_t doubles_per_alignment_{ 8 };
+    static constexpr std::size_t alignment_bytes_{ SIMD_BYTES };
+    static constexpr std::size_t doubles_per_alignment_{ SIMD_BYTES / sizeof(double) };
 
     // PML Region Size:
     std::size_t thickness_;

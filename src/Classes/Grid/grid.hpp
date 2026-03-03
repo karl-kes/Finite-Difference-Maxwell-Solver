@@ -14,8 +14,8 @@ class Grid {
 private:
     // Number of field components:
     static constexpr std::size_t num_vec_components_{ 9 };
-    static constexpr std::size_t alignment_bytes_{ 64 };
-    static constexpr std::size_t doubles_per_alignment_{ 8 };
+    static constexpr std::size_t alignment_bytes_{ SIMD_BYTES };
+    static constexpr std::size_t doubles_per_alignment_{ SIMD_BYTES / sizeof( double ) };
 
     // Grid Dimensions:
     std::size_t Nx_, Ny_, Nz_;
