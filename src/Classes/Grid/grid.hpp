@@ -62,7 +62,7 @@ public:
 
     // System Simulation:
     void step();
-    void apply_sources( double const time_step = 0.0 );
+    void apply_sources( std::size_t const time_step = 0 );
     void add_source( std::unique_ptr<Source> source );
 
     // Finds flattened 1D index given 3D space:

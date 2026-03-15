@@ -13,23 +13,13 @@ Simulation::Simulation( Simulation_Config const &new_config )
 , output_{ "output" }
 { }
 
-void Simulation::print_progress( double const current, double const total ) const {
-    double const percent{ 100.0 * current / total };
+void Simulation::print_progress( std::size_t const current, std::size_t const total ) const {
+    double const percent{ 100.0 * static_cast<double>( current ) / static_cast<double>( total ) };
     std::cout << "\rProgress: " << percent << "%" << std::flush;
 }
 
 void Simulation::initialize() {
     output_.initialize();
-
-    // Add sources:
-    // grid_.add_source( std::make_unique<Straight_Wire_X>(
-    //     10.0,                           // amplitude
-    //     1.0,                            // frequency
-    //     config_.Ny / 2,                  // y position
-    //     config_.Nz / 2,                  // z position
-    //     config_.Nx / 4,                  // x start
-    //     3 * config_.Nx / 4               // x end
-    // ) );
 
     grid_.add_source( std::make_unique<Point_Source>(
         10.0,
@@ -37,15 +27,6 @@ void Simulation::initialize() {
         config_.Ny / 2,
         config_.Nz / 2
     ) );
-
-    // grid_.add_source( std::make_unique<Gaussian_Pulse>(
-    //     10.0,                   // Amplitude
-    //     30 * 3 * grid_.dt(),     // Center Time
-    //     30 * grid_.dt(),         // Width
-    //     config_.Nx / 2,          // x
-    //     config_.Ny / 2,          // y
-    //     config_.Nz / 2           // z
-    // ) );
 }
 
 void Simulation::run() {
@@ -78,5 +59,5 @@ void Simulation::run() {
     std::cout << "\n\nResults:\n";
     std::cout << "--------\n";
     std::cout << "Duration: " << duration.count() << " ms\n";
-    std::cout << "Physical time: " << config_.total_time * grid_.dt() << " s\n";
+    std::cout << "Physical time: " << static_cast<double>( config_.total_time ) * grid_.dt() << " s\n";
 }

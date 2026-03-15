@@ -28,7 +28,7 @@ private:
 
     static double compute_wavelength( Grid const &grid, Simulation_Config const &cfg ) {
         std::size_t const usable_cells{ grid.Nx() - 2 * cfg.pml_thickness };
-        double const wave_cells{ std::min( 20.0, usable_cells * 0.3 ) };
+        double const wave_cells{ std::min( 20.0, static_cast<double>( usable_cells ) * 0.3 ) };
         return wave_cells * grid.dx();
     }
 

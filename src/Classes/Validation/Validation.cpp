@@ -15,7 +15,7 @@ Plane_Wave_Test::Plane_Wave_Test( Simulation_Config const &cfg )
 , probe_x_{ grid_.Nx() / 2 }
 , probe_y_{ grid_.Ny() / 2 }
 , probe_z_{ grid_.Nz() / 2 }
-, initial_phase_{ wavenumber_ * probe_x_ * grid_.dx() }
+, initial_phase_{ wavenumber_ * static_cast<double>( probe_x_ ) * grid_.dx() }
 , phase_shift_per_step_{ wavenumber_ * grid_.c() * grid_.dt() }
 { }
 
@@ -29,7 +29,7 @@ void Plane_Wave_Test::initialize() {
     for ( std::size_t z = margin; z < grid_.Nz() - margin; ++z ) {
         for ( std::size_t y = margin; y < grid_.Ny() - margin; ++y ) {
             for ( std::size_t x = margin; x < grid_.Nx() - margin; ++x ) {
-                double const phase{ wavenumber_ * x * grid_.dx() };
+                double const phase{ wavenumber_ * static_cast<double>( x ) * grid_.dx() };
                 std::size_t const i{ grid_.idx(x,y,z) };
 
                 Ey[i] = std::sin( phase );
@@ -54,7 +54,7 @@ Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
     for ( std::size_t t = 0; t < num_steps; ++t ) {
         std::size_t const i{ grid_.idx(probe_x_, probe_y_, probe_z_) };
 
-        double const expected_Ey{ std::sin( initial_phase_ - phase_shift_per_step_ * t ) };
+        double const expected_Ey{ std::sin( initial_phase_ - phase_shift_per_step_ * static_cast<double>( t ) ) };
         double const actual_Ey{ grid_.Ey_ptr()[i] };
 
         sum_expected += expected_Ey;

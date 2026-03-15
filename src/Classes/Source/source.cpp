@@ -3,9 +3,9 @@
 #include <numbers>
 #include <cmath>
 
-void Straight_Wire_X::apply( Grid &grid, double const time_step ) {
+void Straight_Wire_X::apply( Grid &grid, std::size_t const time_step ) {
     double const omega{ 2.0 * std::numbers::pi * frequency_ };
-    double const current{ amplitude_ * std::sin( omega * time_step * grid.dt() ) };
+    double const current{ amplitude_ * std::sin( omega * static_cast<double>( time_step ) * grid.dt() ) };
 
     double* RESTRICT Jx{ grid.Jx_ptr() };
 
@@ -15,7 +15,7 @@ void Straight_Wire_X::apply( Grid &grid, double const time_step ) {
     }
 }
 
-void Point_Source::apply( Grid &grid, double const time_step ) {
+void Point_Source::apply( Grid &grid, std::size_t const time_step ) {
     ( void )time_step;
     std::size_t const i{ grid.idx(x_,y_,z_) };
 
@@ -28,9 +28,10 @@ void Point_Source::apply( Grid &grid, double const time_step ) {
     Jz[i] = value_;
 }
 
-void Gaussian_Pulse::apply( Grid& grid, double const time_step ) {
+void Gaussian_Pulse::apply( Grid& grid, std::size_t const time_step ) {
+    double const t{ static_cast<double>( time_step ) * grid.dt() };
     double const exponent{
-        -0.5 * ( ( time_step * grid.dt() - t_0_ ) / width_ ) * ( ( time_step * grid.dt() - t_0_ ) / width_ )
+        -0.5 * ( ( t - t_0_ ) / width_ ) * ( ( t - t_0_ ) / width_ )
     };
     std::size_t const i{ grid.idx(x_,y_,z_) };
 

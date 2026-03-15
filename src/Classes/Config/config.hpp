@@ -24,7 +24,7 @@ public:
 
     // Time Stepping:
     double static constexpr cfl_factor{ 0.125 };
-    double static constexpr total_time{ 1000.0 };
+    std::size_t static constexpr total_time{ 1000 };
     double const dt{ cfl_factor / ( c * std::sqrt( 1.0/(dx*dx) + 1.0/(dy*dy) + 1.0/(dz*dz) ) ) };
 
     // Validation:
@@ -38,7 +38,7 @@ public:
     double static constexpr pml_kappa_max{ 15.0 };
     double static constexpr pml_alpha_max{ 0.05 };
 
-    std::size_t output_interval() const { return static_cast<std::size_t>( total_time / 100 ); }
+    std::size_t output_interval() const { return total_time / 100; }
 };
 
 enum class Field {

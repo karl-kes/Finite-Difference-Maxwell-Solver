@@ -8,7 +8,7 @@
 #include <vector>
 #include <cmath>
 
-void Output::write_field( Grid const& grid, double const time_step ) const {
+void Output::write_field( Grid const& grid, std::size_t const time_step ) const {
     // Electric:
     std::string path_E{ file_name( Field::ELECTRIC, time_step ) };
     std::ofstream file_E( path_E, std::ios::binary | std::ios::out );
@@ -61,7 +61,7 @@ void Output::write_field( Grid const& grid, double const time_step ) const {
             }
         }
         file_E.write( reinterpret_cast<char const*>( buffer.data() ), 
-                      buffer.size() * sizeof( double ) );
+                      static_cast<std::streamsize>( buffer.size() * sizeof( double ) ) );
     }
     file_E.close();
 
@@ -97,7 +97,7 @@ void Output::write_field( Grid const& grid, double const time_step ) const {
             }
         }
         file_B.write( reinterpret_cast<char const*>( buffer.data() ), 
-                      buffer.size() * sizeof( double ) );
+                      static_cast<std::streamsize>( buffer.size() * sizeof( double ) ) );
     }
     file_B.close();
 }

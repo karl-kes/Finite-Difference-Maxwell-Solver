@@ -33,7 +33,7 @@ void Grid::add_source( std::unique_ptr<Source> source ) {
     sources_.push_back( std::move( source ) );
 }
 
-void Grid::apply_sources( double const time_step ) {
+void Grid::apply_sources( std::size_t const time_step ) {
     for ( auto const &source : sources_ ) {
         source->apply( *this, time_step );
     }

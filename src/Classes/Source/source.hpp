@@ -10,7 +10,7 @@ class Grid;
 class Source {
 public:
     virtual ~Source() = default;
-    virtual void apply( Grid &grid, double const time_step ) = 0;
+    virtual void apply( Grid &grid, std::size_t const time_step ) = 0;
 };
 
 // Straight wire with sinusoidal current along x:
@@ -35,7 +35,7 @@ public:
         , x_end_{ x_end }
         { }
 
-    void apply( Grid &grid, double const time_step ) override;
+    void apply( Grid &grid, std::size_t const time_step ) override;
 };
 
 // Hard source injection at single point:
@@ -54,7 +54,7 @@ public:
         , z_{ z }
         { }
 
-    void apply( Grid &grid, double const time_step ) override;
+    void apply( Grid &grid, std::size_t const time_step ) override;
 };
 
 // Gaussian pulse current source:
@@ -77,5 +77,5 @@ public:
         , x_{ x }, y_{ y }, z_{ z }
         { }
 
-    void apply( Grid &grid, double const time_step ) override;
+    void apply( Grid &grid, std::size_t const time_step ) override;
 };

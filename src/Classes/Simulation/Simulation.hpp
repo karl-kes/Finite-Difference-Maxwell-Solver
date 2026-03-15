@@ -6,7 +6,7 @@
 
 class Simulation {
 private:
-    void print_progress( double const current, double const total ) const;
+    void print_progress( std::size_t const current, std::size_t const total ) const;
     
 public:
     Simulation_Config config_;
