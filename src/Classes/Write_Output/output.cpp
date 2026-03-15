@@ -8,14 +8,6 @@
 #include <vector>
 #include <cmath>
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define RESTRICT __restrict__
-#elif defined(_MSC_VER)
-    #define RESTRICT __restrict
-#else
-    #define RESTRICT
-#endif
-
 void Output::write_field( Grid const& grid, double const time_step ) const {
     // Electric:
     std::string path_E{ file_name( Field::ELECTRIC, time_step ) };
@@ -47,20 +39,15 @@ void Output::write_field( Grid const& grid, double const time_step ) const {
     double const* RESTRICT By{ grid.By_ptr() };
     double const* RESTRICT Bz{ grid.Bz_ptr() };
 
-
     for ( std::size_t z = 0; z < nz; ++z ) {
         buffer.clear();
         for ( std::size_t y = 0; y < ny; ++y ) {
             for ( std::size_t x = 0; x < nx; ++x ) {
-                // Index:
                 std::size_t const i{ grid.idx(x,y,z) };
-
-                // Forward Index:
                 std::size_t const ix2{ grid.idx(x+1,y,z ) };
                 std::size_t const iy2{ grid.idx(x,y+1,z) };
                 std::size_t const iz2{ grid.idx(x,y,z+1) };
 
-                // Average to cell centers for visualization; deals with Yee staggering:
                 double const Ex_mag{ 0.5 * ( Ex[i] + Ex[ix2] ) };
                 double const Ey_mag{ 0.5 * ( Ey[i] + Ey[iy2] ) };
                 double const Ez_mag{ 0.5 * ( Ez[i] + Ez[iz2] ) };
@@ -92,20 +79,15 @@ void Output::write_field( Grid const& grid, double const time_step ) const {
         buffer.clear();
         for ( std::size_t y = 0; y < ny; ++y ) {
             for ( std::size_t x = 0; x < nx; ++x ) {
-                // Index:
                 std::size_t const i{ grid.idx(x,y,z) };
-
-                // Forward Index:
                 std::size_t const ix2{ grid.idx(x+1,y,z ) };
                 std::size_t const iy2{ grid.idx(x,y+1,z) };
                 std::size_t const iz2{ grid.idx(x,y,z+1) };
                 
-                // Average to cell centers for visualization; deals with Yee staggering:
                 double const Bx_mag{ 0.5 * ( Bx[i] + Bx[ix2] ) };
                 double const By_mag{ 0.5 * ( By[i] + By[iy2] ) };
                 double const Bz_mag{ 0.5 * ( Bz[i] + Bz[iz2] ) };
 
-  
                 double const B_mag{ std::sqrt( Bx_mag*Bx_mag + By_mag*By_mag + Bz_mag*Bz_mag ) };
 
                 buffer.push_back( Bx_mag );

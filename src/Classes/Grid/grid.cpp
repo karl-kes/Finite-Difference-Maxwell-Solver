@@ -7,21 +7,13 @@
 #include <omp.h>
 #include <utility>
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define RESTRICT __restrict__
-#elif defined(_MSC_VER)
-    #define RESTRICT __restrict
-#else
-    #define RESTRICT
-#endif
-
 Grid::Grid( Simulation_Config const &config )
 : Nx_{ config.Nx + 1 }
 , Ny_{ config.Ny + 1 }
 , Nz_{ config.Nz + 1 }
-, Nx_padded_{ (Nx_ + doubles_per_alignment_ - 1) & ~(doubles_per_alignment_ - 1) }
-, Ny_padded_{ (Ny_ + doubles_per_alignment_ - 1) & ~(doubles_per_alignment_ - 1) }
-, Nz_padded_{ (Nz_ + doubles_per_alignment_ - 1) & ~(doubles_per_alignment_ - 1) }
+, Nx_padded_{ AlignedSoA<double>::round_up( Nx_ ) }
+, Ny_padded_{ AlignedSoA<double>::round_up( Ny_ ) }
+, Nz_padded_{ AlignedSoA<double>::round_up( Nz_ ) }
 , N_{ Nx_*Ny_*Nz_ }
 , dx_{ config.dx }
 , dy_{ config.dy }
@@ -31,24 +23,9 @@ Grid::Grid( Simulation_Config const &config )
 , c_{ config.c }
 , c_sq_{ config.c * config.c }
 , dt_{ config.dt }
-, alignment_padding_{ Nx_padded_ * Ny_padded_ * Nz_padded_ }
-, pml_{ config } {
-    // Round to nearest multiple of 8 - needed to ensure sub-arrays are 64 byte aligned:
-
-    // Determine size of the memory block in bytes:
-    std::size_t const memory_block_size{ num_vec_components_*alignment_padding_ };
-    std::size_t const block_size_bytes{ memory_block_size * sizeof(double) };
-    
-    // 64 byte alignment and allocation:
-    double* ptr = static_cast<double*>(alignedAlloc(alignment_bytes_, block_size_bytes));
-    if (!ptr) { throw std::bad_alloc(); }
-
-    // Zero initialization:
-    std::fill_n(ptr, memory_block_size, 0.0);
-
-    // Pointer owner transfership:
-    memory_block_.reset(ptr);
-}
+, fields_{ Nx_padded_ * Ny_padded_ * Nz_padded_, NUM_GRID_ARRAYS_ }
+, pml_{ config }
+{ }
 
 Grid::~Grid() = default;
 
@@ -87,7 +64,6 @@ void Grid::update_B() {
     std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
-    // Start at 0; stagger for Yee-Cell grid.
     for ( std::size_t z = 0; z < Nz_local - 1; ++z ) {
         for ( std::size_t y = 0; y < Ny_local - 1; ++y ) {
             #pragma omp simd
@@ -97,7 +73,6 @@ void Grid::update_B() {
                 std::size_t const iy{ i + Sy };
                 std::size_t const iz{ i + Sz };
 
-                // Take curl of components and apply B -= ∂B:
                 double const curl_x_E{ 
                     ( Ez[iy] - Ez[i] ) * inv_dy
                   - ( Ey[iz] - Ey[i] ) * inv_dz
@@ -113,13 +88,8 @@ void Grid::update_B() {
                   - ( Ex[iy] - Ex[i] ) * inv_dy
                 };
 
-                // ∂B_x = ∂t * curl_x( E )
                 Bx[i] -= dt_local * curl_x_E;
-
-                // ∂B_y = ∂t * curl_y( E )
                 By[i] -= dt_local * curl_y_E;
-
-                // ∂B_z = ∂t * curl_z( E )
                 Bz[i] -= dt_local * curl_z_E;
             }
         }
@@ -132,7 +102,7 @@ void Grid::update_B() {
 }
 
 void Grid::update_E() {
-    // ∂E/∂t = c*c * curl(B)
+    // ∂E/∂t = c*c * curl(B) - J/eps
 
     double* RESTRICT Bx{ Bx_ptr() };
     double* RESTRICT By{ By_ptr() };
@@ -162,7 +132,6 @@ void Grid::update_E() {
     std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
-    // Start at 1; stagger for Yee-Cell grid.
     for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
         for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
 
@@ -173,7 +142,6 @@ void Grid::update_E() {
                 std::size_t const iy{ i - Sy };
                 std::size_t const iz{ i - Sz };
 
-                // Curl of components and apply E += ∂E:
                 double const curl_x_B{ 
                     ( Bz[i] - Bz[iy] ) * inv_dy
                   - ( By[i] - By[iz] ) * inv_dz
@@ -193,13 +161,8 @@ void Grid::update_E() {
                 double const jy_term{ Jy[i] * inv_eps };
                 double const jz_term{ Jz[i] * inv_eps };
 
-                // ∂E_x = ∂t * c*c * (∂E_z/∂y - ∂E_y/∂z)
                 Ex[i] += dt_local * ( c_sq_local * curl_x_B - jx_term );
-
-                // ∂E_y = ∂t * c*c * (∂Ex/∂z - ∂Ez/∂x)
                 Ey[i] += dt_local * ( c_sq_local * curl_y_B - jy_term );
-
-                // ∂E_z = ∂t * c*c * (∂Ex/∂y - ∂Ey/∂x)
                 Ez[i] += dt_local * ( c_sq_local * curl_z_B - jz_term );
             }
         }

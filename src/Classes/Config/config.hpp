@@ -20,7 +20,7 @@ public:
     // Material Properties:
     double static constexpr mu{ 1.0 };
     double static constexpr eps{ 1.0 };
-    double const c{ 1.0 / ( std::sqrt ( mu * eps ) ) };
+    double const c{ 1.0 / ( std::sqrt( mu * eps ) ) };
 
     // Time Stepping:
     double static constexpr cfl_factor{ 0.125 };
@@ -38,7 +38,7 @@ public:
     double static constexpr pml_kappa_max{ 15.0 };
     double static constexpr pml_alpha_max{ 0.05 };
 
-    std::size_t output_interval() const { return static_cast<std::size_t>( total_time / 100) ; }
+    std::size_t output_interval() const { return static_cast<std::size_t>( total_time / 100 ); }
 };
 
 enum class Field {

@@ -6,15 +6,6 @@
 #include <iomanip>
 #include <algorithm>
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define RESTRICT __restrict__
-#elif defined(_MSC_VER)
-    #define RESTRICT __restrict
-#else
-    #define RESTRICT
-#endif
-
-
 Plane_Wave_Test::Plane_Wave_Test( Simulation_Config const &cfg )
 : config_{ cfg }
 , grid_{ config_ }
@@ -78,7 +69,6 @@ Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
 
     double const final_energy{ grid_.total_energy() };
 
-    // Calculate Metrics:
     double const energy_drift{ 100.0 * std::abs( final_energy - initial_energy ) / initial_energy };
 
     double const n{ static_cast<double>( num_steps ) };
@@ -89,16 +79,14 @@ Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
     };
     double const correlation{ correlation_den > 1e-10 ? ( correlation_num / correlation_den ) : 0.0 };
 
-    // Dispersion: average phase error relative to expected phase shift
     double const avg_phase_error{ total_phase_error / n };
     double const total_expected_shift{ phase_shift_per_step_ * n };
     double const dispersion{ 100.0 * avg_phase_error / std::max( total_expected_shift, 1e-10 ) };
 
-    // Pass criteria
     bool const passed{ 
-        energy_drift < 5.0 &&      // <5% energy drift
-        correlation > 0.99 &&      // >99% correlation
-        dispersion < 10.0          // <10% dispersion
+        energy_drift < 5.0 &&
+        correlation > 0.99 &&
+        dispersion < 10.0
     };
 
     return Validation_Result{ passed, energy_drift, dispersion, correlation };

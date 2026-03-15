@@ -3,14 +3,6 @@
 #include <numbers>
 #include <cmath>
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define RESTRICT __restrict__
-#elif defined(_MSC_VER)
-    #define RESTRICT __restrict
-#else
-    #define RESTRICT
-#endif
-
 void Straight_Wire_X::apply( Grid &grid, double const time_step ) {
     double const omega{ 2.0 * std::numbers::pi * frequency_ };
     double const current{ amplitude_ * std::sin( omega * time_step * grid.dt() ) };

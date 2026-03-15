@@ -56,7 +56,7 @@ void Simulation::run() {
     grid_.step();
 
     // Run simulation and start timer:
-    std::size_t const output__interval{ config_.output_interval() };
+    std::size_t const output_interval{ config_.output_interval() };
     auto const start_time{ std::chrono::high_resolution_clock::now() };
 
     // Simulation Loop:
@@ -64,7 +64,7 @@ void Simulation::run() {
         grid_.apply_sources( curr_time );
         grid_.step();
 
-        if ( ( curr_time % config_.output_interval() ) == 0 ) {
+        if ( ( curr_time % output_interval ) == 0 ) {
             output_.write_field( grid_, curr_time );
             print_progress( curr_time, config_.total_time );
         }
