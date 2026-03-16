@@ -1,6 +1,7 @@
 #include "PML.hpp"
 
 #include <omp.h>
+#include <algorithm>
 
 PML::PML( Simulation_Config const &config )
 : thickness_{ config.use_pml ? config.pml_thickness : 0 }
@@ -17,8 +18,7 @@ PML::PML( Simulation_Config const &config )
 , psi_{}
 , psi_face_x_{ thickness_ * Ny_ * Nz_ }
 , psi_face_y_{ Nx_ * thickness_ * Nz_ }
-, psi_face_z_{ Nx_ * Ny_ * thickness_ }
-{
+, psi_face_z_{ Nx_ * Ny_ * thickness_ } {
     if ( !config.use_pml || thickness_ == 0 ) return;
 
     coeffs_ = AlignedSoA<double>{ thickness_, NUM_COEFF_ARRAYS_ };
@@ -48,23 +48,24 @@ PML::PML( Simulation_Config const &config )
 
         compute_coefficients( sig_E, kap_E, alp_E, config.dt, config.eps, b_Ex[i], c_Ex[i] );
         compute_coefficients( sig_B, kap_B, alp_B, config.dt, config.eps, b_Bx[i], c_Bx[i] );
-
         kappa_Ex[i] = kap_E;
         kappa_Bx[i] = kap_B;
 
         compute_coefficients( sig_E, kap_E, alp_E, config.dt, config.eps, b_Ey[i], c_Ey[i] );
         compute_coefficients( sig_B, kap_B, alp_B, config.dt, config.eps, b_By[i], c_By[i] );
-
         kappa_Ey[i] = kap_E;
         kappa_By[i] = kap_B;
 
         compute_coefficients( sig_E, kap_E, alp_E, config.dt, config.eps, b_Ez[i], c_Ez[i] );
         compute_coefficients( sig_B, kap_B, alp_B, config.dt, config.eps, b_Bz[i], c_Bz[i] );
-
         kappa_Ez[i] = kap_E;
         kappa_Bz[i] = kap_B;
     }
 }
+
+// ── B-field PML ─────────────────────────────────────────────────────────────
+// B-update covers x,y,z in [0, N-2]. No boundary clamping needed — all PML
+// layers d in [0,t) map to valid grid indices for both lo and hi faces.
 
 void PML::update_B_psi(
     double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
@@ -77,119 +78,172 @@ void PML::update_B_psi(
     std::size_t const face_y{ psi_face_y_ };
     std::size_t const face_z{ psi_face_z_ };
 
-    double const* RESTRICT b_Bx{ b_Bx_ptr() };
-    double const* RESTRICT c_Bx{ c_Bx_ptr() };
-    double const* RESTRICT b_By{ b_By_ptr() };
-    double const* RESTRICT c_By{ c_By_ptr() };
-    double const* RESTRICT b_Bz{ b_Bz_ptr() };
-    double const* RESTRICT c_Bz{ c_Bz_ptr() };
+    std::size_t const Sx{ 1 };
+    std::size_t const Sy{ Nx_padded_ };
+    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
 
-    double* RESTRICT psi_Byx{ psi_Byx_ptr() };
-    double* RESTRICT psi_Bzx{ psi_Bzx_ptr() };
-    double* RESTRICT psi_Bxy{ psi_Bxy_ptr() };
-    double* RESTRICT psi_Bzy{ psi_Bzy_ptr() };
-    double* RESTRICT psi_Bxz{ psi_Bxz_ptr() };
-    double* RESTRICT psi_Byz{ psi_Byz_ptr() };
+    double const inv_dx{ 1.0 / dx };
+    double const inv_dy{ 1.0 / dy };
+    double const inv_dz{ 1.0 / dz };
 
+    double const* RESTRICT bBx{ b_Bx_ptr() };
+    double const* RESTRICT cBx{ c_Bx_ptr() };
+    double const* RESTRICT bBy{ b_By_ptr() };
+    double const* RESTRICT cBy{ c_By_ptr() };
+    double const* RESTRICT bBz{ b_Bz_ptr() };
+    double const* RESTRICT cBz{ c_Bz_ptr() };
+
+    double* RESTRICT pByx{ psi_Byx_ptr() };
+    double* RESTRICT pBzx{ psi_Bzx_ptr() };
+    double* RESTRICT pBxy{ psi_Bxy_ptr() };
+    double* RESTRICT pBzy{ psi_Bzy_ptr() };
+    double* RESTRICT pBxz{ psi_Bxz_ptr() };
+    double* RESTRICT pByz{ psi_Byz_ptr() };
+
+    std::size_t const nx{ Nx_ };
+    std::size_t const ny{ Ny_ };
+    std::size_t const nz{ Nz_ };
+
+    // High-face base x-index:
+    std::size_t const x_hi_base{ nx - 1 - t };
+
+    // ── x-faces ──
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 0; z < Nz_ - 1; ++z ) {
-        for ( std::size_t y = 0; y < Ny_ - 1; ++y ) {
+    for ( std::size_t z = 0; z < nz - 1; ++z ) {
+        for ( std::size_t y = 0; y < ny - 1; ++y ) {
+            std::size_t const yz_grid_base{ y * Sy + z * Sz };
+            std::size_t const yz_psi_base{ t * ( y + ny * z ) };
+
             for ( std::size_t d = 0; d < t; ++d ) {
-                std::size_t const x_lo{ d };
-                std::size_t const gi_lo{ idx( x_lo, y, z ) };
-                std::size_t const pi_lo{ psi_idx_x( d, y, z ) };
+                // Low face: x = d
+                std::size_t const gi_lo{ yz_grid_base + d };
+                std::size_t const pi_lo{ yz_psi_base + d };
 
-                double const dEy_dx_lo{ ( Ey[idx( x_lo + 1, y, z )] - Ey[gi_lo] ) / dx };
-                double const dEz_dx_lo{ ( Ez[idx( x_lo + 1, y, z )] - Ez[gi_lo] ) / dx };
+                double const dEy_lo{ ( Ey[gi_lo + Sx] - Ey[gi_lo] ) * inv_dx };
+                double const dEz_lo{ ( Ez[gi_lo + Sx] - Ez[gi_lo] ) * inv_dx };
 
-                psi_Byx[pi_lo] = b_Bx[d] * psi_Byx[pi_lo] + c_Bx[d] * dEy_dx_lo;
-                psi_Bzx[pi_lo] = b_Bx[d] * psi_Bzx[pi_lo] + c_Bx[d] * dEz_dx_lo;
+                double const b_lo{ bBx[d] };
+                double const c_lo{ cBx[d] };
 
-                Bz[gi_lo] -= dt * psi_Byx[pi_lo];
-                By[gi_lo] += dt * psi_Bzx[pi_lo];
+                pByx[pi_lo] = b_lo * pByx[pi_lo] + c_lo * dEy_lo;
+                pBzx[pi_lo] = b_lo * pBzx[pi_lo] + c_lo * dEz_lo;
 
-                std::size_t const x_hi{ Nx_ - 1 - t + d };
-                std::size_t const gi_hi{ idx( x_hi, y, z ) };
-                std::size_t const pi_hi{ face_x + psi_idx_x( d, y, z ) };
+                Bz[gi_lo] -= dt * pByx[pi_lo];
+                By[gi_lo] += dt * pBzx[pi_lo];
 
-                double const dEy_dx_hi{ ( Ey[idx( x_hi + 1, y, z )] - Ey[gi_hi] ) / dx };
-                double const dEz_dx_hi{ ( Ez[idx( x_hi + 1, y, z )] - Ez[gi_hi] ) / dx };
+                // High face: x = x_hi_base + d
+                std::size_t const gi_hi{ yz_grid_base + x_hi_base + d };
+                std::size_t const pi_hi{ face_x + pi_lo };
 
-                psi_Byx[pi_hi] = b_Bx[t - 1 - d] * psi_Byx[pi_hi] + c_Bx[t - 1 - d] * dEy_dx_hi;
-                psi_Bzx[pi_hi] = b_Bx[t - 1 - d] * psi_Bzx[pi_hi] + c_Bx[t - 1 - d] * dEz_dx_hi;
+                double const dEy_hi{ ( Ey[gi_hi + Sx] - Ey[gi_hi] ) * inv_dx };
+                double const dEz_hi{ ( Ez[gi_hi + Sx] - Ez[gi_hi] ) * inv_dx };
 
-                Bz[gi_hi] -= dt * psi_Byx[pi_hi];
-                By[gi_hi] += dt * psi_Bzx[pi_hi];
+                double const b_hi{ bBx[t - 1 - d] };
+                double const c_hi{ cBx[t - 1 - d] };
+
+                pByx[pi_hi] = b_hi * pByx[pi_hi] + c_hi * dEy_hi;
+                pBzx[pi_hi] = b_hi * pBzx[pi_hi] + c_hi * dEz_hi;
+
+                Bz[gi_hi] -= dt * pByx[pi_hi];
+                By[gi_hi] += dt * pBzx[pi_hi];
             }
         }
     }
 
+    // ── y-faces ──
+    std::size_t const y_hi_base{ ny - 1 - t };
+
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 0; z < Nz_ - 1; ++z ) {
-        for ( std::size_t x = 0; x < Nx_ - 1; ++x ) {
+    for ( std::size_t z = 0; z < nz - 1; ++z ) {
+        for ( std::size_t x = 0; x < nx - 1; ++x ) {
+            std::size_t const xz_grid_base{ x + z * Sz };
+            std::size_t const xz_psi_base{ x + nx * t * z };
+
             for ( std::size_t d = 0; d < t; ++d ) {
-                std::size_t const y_lo{ d };
-                std::size_t const gi_lo{ idx( x, y_lo, z ) };
-                std::size_t const pi_lo{ psi_idx_y( x, d, z ) };
+                // Low face: y = d
+                std::size_t const gi_lo{ xz_grid_base + d * Sy };
+                std::size_t const pi_lo{ xz_psi_base + nx * d };
 
-                double const dEx_dy_lo{ ( Ex[idx( x, y_lo + 1, z )] - Ex[gi_lo] ) / dy };
-                double const dEz_dy_lo{ ( Ez[idx( x, y_lo + 1, z )] - Ez[gi_lo] ) / dy };
+                double const dEx_lo{ ( Ex[gi_lo + Sy] - Ex[gi_lo] ) * inv_dy };
+                double const dEz_lo{ ( Ez[gi_lo + Sy] - Ez[gi_lo] ) * inv_dy };
 
-                psi_Bxy[pi_lo] = b_By[d] * psi_Bxy[pi_lo] + c_By[d] * dEx_dy_lo;
-                psi_Bzy[pi_lo] = b_By[d] * psi_Bzy[pi_lo] + c_By[d] * dEz_dy_lo;
+                double const b_lo{ bBy[d] };
+                double const c_lo{ cBy[d] };
 
-                Bz[gi_lo] += dt * psi_Bxy[pi_lo];
-                Bx[gi_lo] -= dt * psi_Bzy[pi_lo];
+                pBxy[pi_lo] = b_lo * pBxy[pi_lo] + c_lo * dEx_lo;
+                pBzy[pi_lo] = b_lo * pBzy[pi_lo] + c_lo * dEz_lo;
 
-                std::size_t const y_hi{ Ny_ - 1 - t + d };
-                std::size_t const gi_hi{ idx( x, y_hi, z ) };
-                std::size_t const pi_hi{ face_y + psi_idx_y( x, d, z ) };
+                Bz[gi_lo] += dt * pBxy[pi_lo];
+                Bx[gi_lo] -= dt * pBzy[pi_lo];
 
-                double const dEx_dy_hi{ ( Ex[idx( x, y_hi + 1, z )] - Ex[gi_hi] ) / dy };
-                double const dEz_dy_hi{ ( Ez[idx( x, y_hi + 1, z )] - Ez[gi_hi] ) / dy };
+                // High face: y = y_hi_base + d
+                std::size_t const gi_hi{ xz_grid_base + ( y_hi_base + d ) * Sy };
+                std::size_t const pi_hi{ face_y + pi_lo };
 
-                psi_Bxy[pi_hi] = b_By[t - 1 - d] * psi_Bxy[pi_hi] + c_By[t - 1 - d] * dEx_dy_hi;
-                psi_Bzy[pi_hi] = b_By[t - 1 - d] * psi_Bzy[pi_hi] + c_By[t - 1 - d] * dEz_dy_hi;
-                
-                Bz[gi_hi] += dt * psi_Bxy[pi_hi];
-                Bx[gi_hi] -= dt * psi_Bzy[pi_hi];
+                double const dEx_hi{ ( Ex[gi_hi + Sy] - Ex[gi_hi] ) * inv_dy };
+                double const dEz_hi{ ( Ez[gi_hi + Sy] - Ez[gi_hi] ) * inv_dy };
+
+                double const b_hi{ bBy[t - 1 - d] };
+                double const c_hi{ cBy[t - 1 - d] };
+
+                pBxy[pi_hi] = b_hi * pBxy[pi_hi] + c_hi * dEx_hi;
+                pBzy[pi_hi] = b_hi * pBzy[pi_hi] + c_hi * dEz_hi;
+
+                Bz[gi_hi] += dt * pBxy[pi_hi];
+                Bx[gi_hi] -= dt * pBzy[pi_hi];
             }
         }
     }
 
+    // ── z-faces ──
+    std::size_t const z_hi_base{ nz - 1 - t };
+
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t y = 0; y < Ny_ - 1; ++y ) {
-        for ( std::size_t x = 0; x < Nx_ - 1; ++x ) {
+    for ( std::size_t y = 0; y < ny - 1; ++y ) {
+        for ( std::size_t x = 0; x < nx - 1; ++x ) {
+            std::size_t const xy_grid_base{ x + y * Sy };
+            std::size_t const xy_psi_base{ x + nx * y };
+
             for ( std::size_t d = 0; d < t; ++d ) {
-                std::size_t const z_lo{ d };
-                std::size_t const gi_lo{ idx( x, y, z_lo ) };
-                std::size_t const pi_lo{ psi_idx_z( x, y, d ) };
+                // Low face: z = d
+                std::size_t const gi_lo{ xy_grid_base + d * Sz };
+                std::size_t const pi_lo{ xy_psi_base + nx * ny * d };
 
-                double const dEx_dz_lo{ ( Ex[idx( x, y, z_lo + 1 )] - Ex[gi_lo] ) / dz };
-                double const dEy_dz_lo{ ( Ey[idx( x, y, z_lo + 1 )] - Ey[gi_lo] ) / dz };
+                double const dEx_lo{ ( Ex[gi_lo + Sz] - Ex[gi_lo] ) * inv_dz };
+                double const dEy_lo{ ( Ey[gi_lo + Sz] - Ey[gi_lo] ) * inv_dz };
 
-                psi_Bxz[pi_lo] = b_Bz[d] * psi_Bxz[pi_lo] + c_Bz[d] * dEx_dz_lo;
-                psi_Byz[pi_lo] = b_Bz[d] * psi_Byz[pi_lo] + c_Bz[d] * dEy_dz_lo;
+                double const b_lo{ bBz[d] };
+                double const c_lo{ cBz[d] };
 
-                Bx[gi_lo] += dt * psi_Byz[pi_lo];
-                By[gi_lo] -= dt * psi_Bxz[pi_lo];
+                pBxz[pi_lo] = b_lo * pBxz[pi_lo] + c_lo * dEx_lo;
+                pByz[pi_lo] = b_lo * pByz[pi_lo] + c_lo * dEy_lo;
 
-                std::size_t const z_hi{ Nz_ - 1 - t + d };
-                std::size_t const gi_hi{ idx( x, y, z_hi ) };
-                std::size_t const pi_hi{ face_z + psi_idx_z( x, y, d ) };
+                Bx[gi_lo] += dt * pByz[pi_lo];
+                By[gi_lo] -= dt * pBxz[pi_lo];
 
-                double const dEx_dz_hi{ ( Ex[idx( x, y, z_hi + 1 )] - Ex[gi_hi] ) / dz };
-                double const dEy_dz_hi{ ( Ey[idx( x, y, z_hi + 1 )] - Ey[gi_hi] ) / dz };
+                // High face: z = z_hi_base + d
+                std::size_t const gi_hi{ xy_grid_base + ( z_hi_base + d ) * Sz };
+                std::size_t const pi_hi{ face_z + pi_lo };
 
-                psi_Bxz[pi_hi] = b_Bz[t - 1 - d] * psi_Bxz[pi_hi] + c_Bz[t - 1 - d] * dEx_dz_hi;
-                psi_Byz[pi_hi] = b_Bz[t - 1 - d] * psi_Byz[pi_hi] + c_Bz[t - 1 - d] * dEy_dz_hi;
-                
-                Bx[gi_hi] += dt * psi_Byz[pi_hi];
-                By[gi_hi] -= dt * psi_Bxz[pi_hi];
+                double const dEx_hi{ ( Ex[gi_hi + Sz] - Ex[gi_hi] ) * inv_dz };
+                double const dEy_hi{ ( Ey[gi_hi + Sz] - Ey[gi_hi] ) * inv_dz };
+
+                double const b_hi{ bBz[t - 1 - d] };
+                double const c_hi{ cBz[t - 1 - d] };
+
+                pBxz[pi_hi] = b_hi * pBxz[pi_hi] + c_hi * dEx_hi;
+                pByz[pi_hi] = b_hi * pByz[pi_hi] + c_hi * dEy_hi;
+
+                Bx[gi_hi] += dt * pByz[pi_hi];
+                By[gi_hi] -= dt * pBxz[pi_hi];
             }
         }
     }
 }
+
+// ── E-field PML ─────────────────────────────────────────────────────────────
+// E-update covers x,y,z in [1, N-2]. The high-face loop bound is clamped so
+// d never produces an index >= N-1, eliminating all inner-loop branches.
 
 void PML::update_E_psi(
     double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
@@ -203,134 +257,167 @@ void PML::update_E_psi(
     std::size_t const face_y{ psi_face_y_ };
     std::size_t const face_z{ psi_face_z_ };
 
-    double const* RESTRICT b_Ex{ b_Ex_ptr() };
-    double const* RESTRICT c_Ex{ c_Ex_ptr() };
-    double const* RESTRICT b_Ey{ b_Ey_ptr() };
-    double const* RESTRICT c_Ey{ c_Ey_ptr() };
-    double const* RESTRICT b_Ez{ b_Ez_ptr() };
-    double const* RESTRICT c_Ez{ c_Ez_ptr() };
+    std::size_t const Sx{ 1 };
+    std::size_t const Sy{ Nx_padded_ };
+    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
 
-    double* RESTRICT psi_Eyx{ psi_Eyx_ptr() };
-    double* RESTRICT psi_Ezx{ psi_Ezx_ptr() };
-    double* RESTRICT psi_Exy{ psi_Exy_ptr() };
-    double* RESTRICT psi_Ezy{ psi_Ezy_ptr() };
-    double* RESTRICT psi_Exz{ psi_Exz_ptr() };
-    double* RESTRICT psi_Eyz{ psi_Eyz_ptr() };
+    double const inv_dx{ 1.0 / dx };
+    double const inv_dy{ 1.0 / dy };
+    double const inv_dz{ 1.0 / dz };
+    double const dt_csq{ dt * c_sq };
 
-    // E-field update loop bounds match Grid::update_E():
-    //   x in [1, Nx-2], y in [1, Ny-2], z in [1, Nz-2]
-    // PML high-face indices must stay within these bounds.
+    double const* RESTRICT bEx{ b_Ex_ptr() };
+    double const* RESTRICT cEx{ c_Ex_ptr() };
+    double const* RESTRICT bEy{ b_Ey_ptr() };
+    double const* RESTRICT cEy{ c_Ey_ptr() };
+    double const* RESTRICT bEz{ b_Ez_ptr() };
+    double const* RESTRICT cEz{ c_Ez_ptr() };
 
-    // x-faces (low and high):
+    double* RESTRICT pEyx{ psi_Eyx_ptr() };
+    double* RESTRICT pEzx{ psi_Ezx_ptr() };
+    double* RESTRICT pExy{ psi_Exy_ptr() };
+    double* RESTRICT pEzy{ psi_Ezy_ptr() };
+    double* RESTRICT pExz{ psi_Exz_ptr() };
+    double* RESTRICT pEyz{ psi_Eyz_ptr() };
+
+    std::size_t const nx{ Nx_ };
+    std::size_t const ny{ Ny_ };
+    std::size_t const nz{ Nz_ };
+
+    // Clamp loop bounds: E-update valid range is [1, N-2].
+    // Low face: x = d+1, valid while d+1 <= N-2, so d < N-2.
+    // High face: x = N-t+d, valid while N-t+d <= N-2, so d <= t-2.
+    std::size_t const d_max_lo_x{ std::min( t, nx - 2 ) };
+    std::size_t const d_max_hi_x{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
+    std::size_t const x_hi_base{ nx - t };
+
+    std::size_t const d_max_lo_y{ std::min( t, ny - 2 ) };
+    std::size_t const d_max_hi_y{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
+    std::size_t const y_hi_base{ ny - t };
+
+    std::size_t const d_max_lo_z{ std::min( t, nz - 2 ) };
+    std::size_t const d_max_hi_z{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
+    std::size_t const z_hi_base{ nz - t };
+
+    // ── x-faces ──
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 1; z < Nz_ - 1; ++z ) {
-        for ( std::size_t y = 1; y < Ny_ - 1; ++y ) {
-            for ( std::size_t d = 0; d < t; ++d ) {
-                // Low x-face:
-                std::size_t const x_lo{ d + 1 };
-                if ( x_lo >= Nx_ - 1 ) continue;
-                std::size_t const gi_lo{ idx( x_lo, y, z ) };
-                std::size_t const pi_lo{ psi_idx_x( d, y, z ) };
+    for ( std::size_t z = 1; z < nz - 1; ++z ) {
+        for ( std::size_t y = 1; y < ny - 1; ++y ) {
+            std::size_t const yz_grid_base{ y * Sy + z * Sz };
+            std::size_t const yz_psi_base{ t * ( y + ny * z ) };
 
-                double const dBy_dx_lo{ ( By[gi_lo] - By[idx( x_lo - 1, y, z )] ) / dx };
-                double const dBz_dx_lo{ ( Bz[gi_lo] - Bz[idx( x_lo - 1, y, z )] ) / dx };
+            // Low x-face:
+            for ( std::size_t d = 0; d < d_max_lo_x; ++d ) {
+                std::size_t const gi{ yz_grid_base + d + 1 };
+                std::size_t const pi{ yz_psi_base + d };
 
-                psi_Eyx[pi_lo] = b_Ex[d] * psi_Eyx[pi_lo] + c_Ex[d] * dBy_dx_lo;
-                psi_Ezx[pi_lo] = b_Ex[d] * psi_Ezx[pi_lo] + c_Ex[d] * dBz_dx_lo;
+                double const dBy{ ( By[gi] - By[gi - Sx] ) * inv_dx };
+                double const dBz{ ( Bz[gi] - Bz[gi - Sx] ) * inv_dx };
 
-                Ez[gi_lo] += dt * c_sq * psi_Eyx[pi_lo];
-                Ey[gi_lo] -= dt * c_sq * psi_Ezx[pi_lo];
+                pEyx[pi] = bEx[d] * pEyx[pi] + cEx[d] * dBy;
+                pEzx[pi] = bEx[d] * pEzx[pi] + cEx[d] * dBz;
 
-                // High x-face:
-                std::size_t const x_hi{ Nx_ - t + d };
-                if ( x_hi >= Nx_ - 1 ) continue;
-                std::size_t const gi_hi{ idx( x_hi, y, z ) };
-                std::size_t const pi_hi{ face_x + psi_idx_x( d, y, z ) };
+                Ez[gi] += dt_csq * pEyx[pi];
+                Ey[gi] -= dt_csq * pEzx[pi];
+            }
 
-                double const dBy_dx_hi{ ( By[gi_hi] - By[idx( x_hi - 1, y, z )] ) / dx };
-                double const dBz_dx_hi{ ( Bz[gi_hi] - Bz[idx( x_hi - 1, y, z )] ) / dx };
+            // High x-face:
+            for ( std::size_t d = 0; d < d_max_hi_x; ++d ) {
+                std::size_t const gi{ yz_grid_base + x_hi_base + d };
+                std::size_t const pi{ face_x + yz_psi_base + d };
 
-                psi_Eyx[pi_hi] = b_Ex[t - 1 - d] * psi_Eyx[pi_hi] + c_Ex[t - 1 - d] * dBy_dx_hi;
-                psi_Ezx[pi_hi] = b_Ex[t - 1 - d] * psi_Ezx[pi_hi] + c_Ex[t - 1 - d] * dBz_dx_hi;
+                double const dBy{ ( By[gi] - By[gi - Sx] ) * inv_dx };
+                double const dBz{ ( Bz[gi] - Bz[gi - Sx] ) * inv_dx };
 
-                Ez[gi_hi] += dt * c_sq * psi_Eyx[pi_hi];
-                Ey[gi_hi] -= dt * c_sq * psi_Ezx[pi_hi];
+                std::size_t const rd{ t - 1 - d };
+
+                pEyx[pi] = bEx[rd] * pEyx[pi] + cEx[rd] * dBy;
+                pEzx[pi] = bEx[rd] * pEzx[pi] + cEx[rd] * dBz;
+
+                Ez[gi] += dt_csq * pEyx[pi];
+                Ey[gi] -= dt_csq * pEzx[pi];
             }
         }
     }
 
-    // y-faces (low and high):
+    // ── y-faces ──
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 1; z < Nz_ - 1; ++z ) {
-        for ( std::size_t x = 1; x < Nx_ - 1; ++x ) {
-            for ( std::size_t d = 0; d < t; ++d ) {
-                // Low y-face:
-                std::size_t const y_lo{ d + 1 };
-                if ( y_lo >= Ny_ - 1 ) continue;
-                std::size_t const gi_lo{ idx( x, y_lo, z ) };
-                std::size_t const pi_lo{ psi_idx_y( x, d, z ) };
+    for ( std::size_t z = 1; z < nz - 1; ++z ) {
+        for ( std::size_t x = 1; x < nx - 1; ++x ) {
+            std::size_t const xz_grid_base{ x + z * Sz };
+            std::size_t const xz_psi_base{ x + nx * t * z };
 
-                double const dBx_dy_lo{ ( Bx[gi_lo] - Bx[idx( x, y_lo - 1, z )] ) / dy };
-                double const dBz_dy_lo{ ( Bz[gi_lo] - Bz[idx( x, y_lo - 1, z )] ) / dy };
+            // Low y-face:
+            for ( std::size_t d = 0; d < d_max_lo_y; ++d ) {
+                std::size_t const gi{ xz_grid_base + ( d + 1 ) * Sy };
+                std::size_t const pi{ xz_psi_base + nx * d };
 
-                psi_Exy[pi_lo] = b_Ey[d] * psi_Exy[pi_lo] + c_Ey[d] * dBx_dy_lo;
-                psi_Ezy[pi_lo] = b_Ey[d] * psi_Ezy[pi_lo] + c_Ey[d] * dBz_dy_lo;
+                double const dBx{ ( Bx[gi] - Bx[gi - Sy] ) * inv_dy };
+                double const dBz{ ( Bz[gi] - Bz[gi - Sy] ) * inv_dy };
 
-                Ez[gi_lo] -= dt * c_sq * psi_Exy[pi_lo];
-                Ex[gi_lo] += dt * c_sq * psi_Ezy[pi_lo];
+                pExy[pi] = bEy[d] * pExy[pi] + cEy[d] * dBx;
+                pEzy[pi] = bEy[d] * pEzy[pi] + cEy[d] * dBz;
 
-                // High y-face:
-                std::size_t const y_hi{ Ny_ - t + d };
-                if ( y_hi >= Ny_ - 1 ) continue;
-                std::size_t const gi_hi{ idx( x, y_hi, z ) };
-                std::size_t const pi_hi{ face_y + psi_idx_y( x, d, z ) };
+                Ez[gi] -= dt_csq * pExy[pi];
+                Ex[gi] += dt_csq * pEzy[pi];
+            }
 
-                double const dBx_dy_hi{ ( Bx[gi_hi] - Bx[idx( x, y_hi - 1, z )] ) / dy };
-                double const dBz_dy_hi{ ( Bz[gi_hi] - Bz[idx( x, y_hi - 1, z )] ) / dy };
+            // High y-face:
+            for ( std::size_t d = 0; d < d_max_hi_y; ++d ) {
+                std::size_t const gi{ xz_grid_base + ( y_hi_base + d ) * Sy };
+                std::size_t const pi{ face_y + xz_psi_base + nx * d };
 
-                psi_Exy[pi_hi] = b_Ey[t - 1 - d] * psi_Exy[pi_hi] + c_Ey[t - 1 - d] * dBx_dy_hi;
-                psi_Ezy[pi_hi] = b_Ey[t - 1 - d] * psi_Ezy[pi_hi] + c_Ey[t - 1 - d] * dBz_dy_hi;
+                double const dBx{ ( Bx[gi] - Bx[gi - Sy] ) * inv_dy };
+                double const dBz{ ( Bz[gi] - Bz[gi - Sy] ) * inv_dy };
 
-                Ez[gi_hi] -= dt * c_sq * psi_Exy[pi_hi];
-                Ex[gi_hi] += dt * c_sq * psi_Ezy[pi_hi];
+                std::size_t const rd{ t - 1 - d };
+
+                pExy[pi] = bEy[rd] * pExy[pi] + cEy[rd] * dBx;
+                pEzy[pi] = bEy[rd] * pEzy[pi] + cEy[rd] * dBz;
+
+                Ez[gi] -= dt_csq * pExy[pi];
+                Ex[gi] += dt_csq * pEzy[pi];
             }
         }
     }
 
-    // z-faces (low and high):
+    // ── z-faces ──
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t y = 1; y < Ny_ - 1; ++y ) {
-        for ( std::size_t x = 1; x < Nx_ - 1; ++x ) {
-            for ( std::size_t d = 0; d < t; ++d ) {
-                // Low z-face:
-                std::size_t const z_lo{ d + 1 };
-                if ( z_lo >= Nz_ - 1 ) continue;
-                std::size_t const gi_lo{ idx( x, y, z_lo ) };
-                std::size_t const pi_lo{ psi_idx_z( x, y, d ) };
+    for ( std::size_t y = 1; y < ny - 1; ++y ) {
+        for ( std::size_t x = 1; x < nx - 1; ++x ) {
+            std::size_t const xy_grid_base{ x + y * Sy };
+            std::size_t const xy_psi_base{ x + nx * y };
 
-                double const dBx_dz_lo{ ( Bx[gi_lo] - Bx[idx( x, y, z_lo - 1 )] ) / dz };
-                double const dBy_dz_lo{ ( By[gi_lo] - By[idx( x, y, z_lo - 1 )] ) / dz };
+            // Low z-face:
+            for ( std::size_t d = 0; d < d_max_lo_z; ++d ) {
+                std::size_t const gi{ xy_grid_base + ( d + 1 ) * Sz };
+                std::size_t const pi{ xy_psi_base + nx * ny * d };
 
-                psi_Exz[pi_lo] = b_Ez[d] * psi_Exz[pi_lo] + c_Ez[d] * dBx_dz_lo;
-                psi_Eyz[pi_lo] = b_Ez[d] * psi_Eyz[pi_lo] + c_Ez[d] * dBy_dz_lo;
+                double const dBx{ ( Bx[gi] - Bx[gi - Sz] ) * inv_dz };
+                double const dBy{ ( By[gi] - By[gi - Sz] ) * inv_dz };
 
-                Ey[gi_lo] += dt * c_sq * psi_Exz[pi_lo];
-                Ex[gi_lo] -= dt * c_sq * psi_Eyz[pi_lo];
+                pExz[pi] = bEz[d] * pExz[pi] + cEz[d] * dBx;
+                pEyz[pi] = bEz[d] * pEyz[pi] + cEz[d] * dBy;
 
-                // High z-face:
-                std::size_t const z_hi{ Nz_ - t + d };
-                if ( z_hi >= Nz_ - 1 ) continue;
-                std::size_t const gi_hi{ idx( x, y, z_hi ) };
-                std::size_t const pi_hi{ face_z + psi_idx_z( x, y, d ) };
+                Ey[gi] += dt_csq * pExz[pi];
+                Ex[gi] -= dt_csq * pEyz[pi];
+            }
 
-                double const dBx_dz_hi{ ( Bx[gi_hi] - Bx[idx( x, y, z_hi - 1 )] ) / dz };
-                double const dBy_dz_hi{ ( By[gi_hi] - By[idx( x, y, z_hi - 1 )] ) / dz };
+            // High z-face:
+            for ( std::size_t d = 0; d < d_max_hi_z; ++d ) {
+                std::size_t const gi{ xy_grid_base + ( z_hi_base + d ) * Sz };
+                std::size_t const pi{ face_z + xy_psi_base + nx * ny * d };
 
-                psi_Exz[pi_hi] = b_Ez[t - 1 - d] * psi_Exz[pi_hi] + c_Ez[t - 1 - d] * dBx_dz_hi;
-                psi_Eyz[pi_hi] = b_Ez[t - 1 - d] * psi_Eyz[pi_hi] + c_Ez[t - 1 - d] * dBy_dz_hi;
+                double const dBx{ ( Bx[gi] - Bx[gi - Sz] ) * inv_dz };
+                double const dBy{ ( By[gi] - By[gi - Sz] ) * inv_dz };
 
-                Ey[gi_hi] += dt * c_sq * psi_Exz[pi_hi];
-                Ex[gi_hi] -= dt * c_sq * psi_Eyz[pi_hi];
+                std::size_t const rd{ t - 1 - d };
+
+                pExz[pi] = bEz[rd] * pExz[pi] + cEz[rd] * dBx;
+                pEyz[pi] = bEz[rd] * pEyz[pi] + cEz[rd] * dBy;
+
+                Ey[gi] += dt_csq * pExz[pi];
+                Ex[gi] -= dt_csq * pEyz[pi];
             }
         }
     }

@@ -40,138 +40,117 @@ void Grid::apply_sources( std::size_t const time_step ) {
 }
 
 void Grid::update_B() {
-    // ∂B/∂t = -curl( E )
+    // dB/dt = -curl(E)
 
     double* RESTRICT Bx{ Bx_ptr() };
     double* RESTRICT By{ By_ptr() };
     double* RESTRICT Bz{ Bz_ptr() };
-
     double* RESTRICT Ex{ Ex_ptr() };
     double* RESTRICT Ey{ Ey_ptr() };
     double* RESTRICT Ez{ Ez_ptr() };
 
-    double const dt_local{ dt() };
-    double const inv_dx{ 1.0 / dx() };
-    double const inv_dy{ 1.0 / dy() };
-    double const inv_dz{ 1.0 / dz() };
+    double const dt_local{ dt_ };
+    double const inv_dx{ 1.0 / dx_ };
+    double const inv_dy{ 1.0 / dy_ };
+    double const inv_dz{ 1.0 / dz_ };
 
-    std::size_t const Nx_local{ Nx() };
-    std::size_t const Ny_local{ Ny() };
-    std::size_t const Nz_local{ Nz() };
-
-    std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx_padded() };
-    std::size_t const Sz{ Nx_padded() * Ny_padded() };
+    std::size_t const nx{ Nx_ };
+    std::size_t const ny{ Ny_ };
+    std::size_t const nz{ Nz_ };
+    std::size_t const Sy{ Nx_padded_ };
+    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
-    for ( std::size_t z = 0; z < Nz_local - 1; ++z ) {
-        for ( std::size_t y = 0; y < Ny_local - 1; ++y ) {
+    for ( std::size_t z = 0; z < nz - 1; ++z ) {
+        for ( std::size_t y = 0; y < ny - 1; ++y ) {
+            std::size_t const base{ y * Sy + z * Sz };
+
             #pragma omp simd
-            for ( std::size_t x = 0; x < Nx_local - 1; ++x ) {
-                std::size_t const i{ x + y*Sy + z*Sz };
-                std::size_t const ix{ i + Sx };
-                std::size_t const iy{ i + Sy };
-                std::size_t const iz{ i + Sz };
+            for ( std::size_t x = 0; x < nx - 1; ++x ) {
+                std::size_t const i{ base + x };
 
-                double const curl_x_E{ 
-                    ( Ez[iy] - Ez[i] ) * inv_dy
-                  - ( Ey[iz] - Ey[i] ) * inv_dz
-                 };
-
-                double const curl_y_E{ 
-                    ( Ex[iz] - Ex[i] ) * inv_dz
-                  - ( Ez[ix] - Ez[i] ) * inv_dx
+                double const curl_x{
+                    ( Ez[i + Sy] - Ez[i] ) * inv_dy
+                  - ( Ey[i + Sz] - Ey[i] ) * inv_dz
+                };
+                double const curl_y{
+                    ( Ex[i + Sz] - Ex[i] ) * inv_dz
+                  - ( Ez[i + 1]  - Ez[i] ) * inv_dx
+                };
+                double const curl_z{
+                    ( Ey[i + 1]  - Ey[i] ) * inv_dx
+                  - ( Ex[i + Sy] - Ex[i] ) * inv_dy
                 };
 
-                double const curl_z_E{ 
-                    ( Ey[ix] - Ey[i] ) * inv_dx
-                  - ( Ex[iy] - Ex[i] ) * inv_dy
-                };
-
-                Bx[i] -= dt_local * curl_x_E;
-                By[i] -= dt_local * curl_y_E;
-                Bz[i] -= dt_local * curl_z_E;
+                Bx[i] -= dt_local * curl_x;
+                By[i] -= dt_local * curl_y;
+                Bz[i] -= dt_local * curl_z;
             }
         }
     }
-    pml_.update_B_psi(
-        Ex_ptr(), Ey_ptr(), Ez_ptr(),
-        Bx_ptr(), By_ptr(), Bz_ptr(),
-        dt(), dx(), dy(), dz()
-    );
+    pml_.update_B_psi( Ex_ptr(), Ey_ptr(), Ez_ptr(),
+                       Bx_ptr(), By_ptr(), Bz_ptr(),
+                       dt_, dx_, dy_, dz_ );
 }
 
 void Grid::update_E() {
-    // ∂E/∂t = c*c * curl(B) - J/eps
+    // dE/dt = c^2 * curl(B) - J/eps
 
     double* RESTRICT Bx{ Bx_ptr() };
     double* RESTRICT By{ By_ptr() };
     double* RESTRICT Bz{ Bz_ptr() };
-    
     double* RESTRICT Ex{ Ex_ptr() };
     double* RESTRICT Ey{ Ey_ptr() };
     double* RESTRICT Ez{ Ez_ptr() };
-
     double* RESTRICT Jx{ Jx_ptr() };
     double* RESTRICT Jy{ Jy_ptr() };
     double* RESTRICT Jz{ Jz_ptr() };
 
-    double const dt_local{ dt() };
-    double const c_sq_local{ c_sq() };
-    double const inv_eps{ 1.0 / eps() };
-    double const inv_dx{ 1.0 / dx() };
-    double const inv_dy{ 1.0 / dy() };
-    double const inv_dz{ 1.0 / dz() };
+    double const dt_local{ dt_ };
+    double const csq{ c_sq_ };
+    double const inv_eps{ 1.0 / eps_ };
+    double const inv_dx{ 1.0 / dx_ };
+    double const inv_dy{ 1.0 / dy_ };
+    double const inv_dz{ 1.0 / dz_ };
 
-    std::size_t const Nx_local{ Nx() };
-    std::size_t const Ny_local{ Ny() };
-    std::size_t const Nz_local{ Nz() };
+    std::size_t const nx{ Nx_ };
+    std::size_t const ny{ Ny_ };
+    std::size_t const nz{ Nz_ };
 
-    std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx_padded() };
-    std::size_t const Sz{ Nx_padded() * Ny_padded() };
+    std::size_t const Sy{ Nx_padded_ };
+    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
-    for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
-        for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
+    for ( std::size_t z = 1; z < nz - 1; ++z ) {
+        for ( std::size_t y = 1; y < ny - 1; ++y ) {
+            std::size_t const base{ y * Sy + z * Sz };
 
             #pragma omp simd
-            for ( std::size_t x = 1; x < Nx_local - 1; ++x ) {
-                std::size_t const i{ x + y*Sy + z*Sz };
-                std::size_t const ix{ i - Sx };
-                std::size_t const iy{ i - Sy };
-                std::size_t const iz{ i - Sz };
+            for ( std::size_t x = 1; x < nx - 1; ++x ) {
+                std::size_t const i{ base + x };
 
-                double const curl_x_B{ 
-                    ( Bz[i] - Bz[iy] ) * inv_dy
-                  - ( By[i] - By[iz] ) * inv_dz
+                double const curl_x{
+                    ( Bz[i] - Bz[i - Sy] ) * inv_dy
+                  - ( By[i] - By[i - Sz] ) * inv_dz
+                };
+                double const curl_y{
+                    ( Bx[i] - Bx[i - Sz] ) * inv_dz
+                  - ( Bz[i] - Bz[i - 1]  ) * inv_dx
+                };
+                double const curl_z{
+                    ( By[i] - By[i - 1]  ) * inv_dx
+                  - ( Bx[i] - Bx[i - Sy] ) * inv_dy
                 };
 
-                double const curl_y_B{ 
-                    ( Bx[i] - Bx[iz] ) * inv_dz
-                  - ( Bz[i] - Bz[ix] ) * inv_dx
-                };
-
-                double const curl_z_B{ 
-                    ( By[i] - By[ix] ) * inv_dx
-                  - ( Bx[i] - Bx[iy] ) * inv_dy
-                };
-
-                double const jx_term{ Jx[i] * inv_eps };
-                double const jy_term{ Jy[i] * inv_eps };
-                double const jz_term{ Jz[i] * inv_eps };
-
-                Ex[i] += dt_local * ( c_sq_local * curl_x_B - jx_term );
-                Ey[i] += dt_local * ( c_sq_local * curl_y_B - jy_term );
-                Ez[i] += dt_local * ( c_sq_local * curl_z_B - jz_term );
+                Ex[i] += dt_local * ( csq * curl_x - Jx[i] * inv_eps );
+                Ey[i] += dt_local * ( csq * curl_y - Jy[i] * inv_eps );
+                Ez[i] += dt_local * ( csq * curl_z - Jz[i] * inv_eps );
             }
         }
     }
-    pml_.update_E_psi(
-        Ex_ptr(), Ey_ptr(), Ez_ptr(),
-        Bx_ptr(), By_ptr(), Bz_ptr(),
-        dt(), dx(), dy(), dz(), c_sq()
-    );
+    pml_.update_E_psi( Ex_ptr(), Ey_ptr(), Ez_ptr(),
+                       Bx_ptr(), By_ptr(), Bz_ptr(),
+                       dt_, dx_, dy_, dz_, c_sq_ );
 }
 
 void Grid::step() {
@@ -180,8 +159,7 @@ void Grid::step() {
 }
 
 double Grid::field(
-    Field const field,
-    Component const component,
+    Field const field, Component const component,
     std::size_t const x, std::size_t const y, std::size_t const z ) const {
     std::size_t const i{ idx(x,y,z) };
     if ( field == Field::ELECTRIC ) {
@@ -201,8 +179,7 @@ double Grid::field(
 }
 
 double &Grid::field(
-    Field const field,
-    Component const component,
+    Field const field, Component const component,
     std::size_t const x, std::size_t const y, std::size_t const z ) {
     std::size_t const i{ idx(x,y,z) };
     if ( field == Field::ELECTRIC ) {
@@ -233,7 +210,7 @@ double Grid::field_magnitude(
 
 double Grid::total_energy() const {
     double energy{};
-    double const dV{ dx() * dy() * dz() };
+    double const dV{ dx_ * dy_ * dz_ };
 
     double const* RESTRICT Ex{ Ex_ptr() };
     double const* RESTRICT Ey{ Ey_ptr() };
@@ -242,15 +219,20 @@ double Grid::total_energy() const {
     double const* RESTRICT By{ By_ptr() };
     double const* RESTRICT Bz{ Bz_ptr() };
 
-    double const inv_mu{ 1.0 / mu() };
-    double const eps_local{ eps() };
+    double const inv_mu{ 1.0 / mu_ };
+    double const eps_local{ eps_ };
 
-    #pragma omp parallel for collapse( 3 ) reduction( +:energy )
-    for ( std::size_t z = 0; z < Nz(); ++z ) {
-        for ( std::size_t y = 0; y < Ny(); ++y ) {
-            for ( std::size_t x = 0; x < Nx(); ++x ) {
-                std::size_t const i{ idx(x,y,z) };
-                
+    std::size_t const Sy{ Nx_padded_ };
+    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+
+    #pragma omp parallel for collapse( 2 ) reduction( +:energy )
+    for ( std::size_t z = 0; z < Nz_; ++z ) {
+        for ( std::size_t y = 0; y < Ny_; ++y ) {
+            std::size_t const base{ y * Sy + z * Sz };
+
+            for ( std::size_t x = 0; x < Nx_; ++x ) {
+                std::size_t const i{ base + x };
+
                 double const E_sq{ Ex[i]*Ex[i] + Ey[i]*Ey[i] + Ez[i]*Ez[i] };
                 double const B_sq{ Bx[i]*Bx[i] + By[i]*By[i] + Bz[i]*Bz[i] };
 
@@ -263,7 +245,7 @@ double Grid::total_energy() const {
 
 double Grid::source_power() const {
     double power{};
-    double const dV{ dx() * dy() * dz() };
+    double const dV{ dx_ * dy_ * dz_ };
 
     double const* RESTRICT Ex{ Ex_ptr() };
     double const* RESTRICT Ey{ Ey_ptr() };
@@ -271,16 +253,19 @@ double Grid::source_power() const {
     double const* RESTRICT Jx{ Jx_ptr() };
     double const* RESTRICT Jy{ Jy_ptr() };
     double const* RESTRICT Jz{ Jz_ptr() };
-    
-    #pragma omp parallel for collapse( 3 ) reduction( +:power )
-    for ( std::size_t z = 0; z < Nz(); ++z ) {
-        for ( std::size_t y = 0; y < Ny(); ++y ) {
-            for ( std::size_t x = 0; x < Nx(); ++x ) {
-                std::size_t const i{ idx(x,y,z) };
 
-                power -= Jx[i] * Ex[i];
-                power -= Jy[i] * Ey[i];
-                power -= Jz[i] * Ez[i];
+    std::size_t const Sy{ Nx_padded_ };
+    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+
+    #pragma omp parallel for collapse( 2 ) reduction( +:power )
+    for ( std::size_t z = 0; z < Nz_; ++z ) {
+        for ( std::size_t y = 0; y < Ny_; ++y ) {
+            std::size_t const base{ y * Sy + z * Sz };
+
+            for ( std::size_t x = 0; x < Nx_; ++x ) {
+                std::size_t const i{ base + x };
+
+                power -= Jx[i] * Ex[i] + Jy[i] * Ey[i] + Jz[i] * Ez[i];
             }
         }
     }
