@@ -7,7 +7,6 @@
 #include <cstddef>
 #include <algorithm>
 
-// CPML coefficient array indices (monolithic block, stride = thickness_padded):
 enum CoeffArray : std::size_t {
     B_EX_,  C_EX_,  KAPPA_EX_,
     B_BX_,  C_BX_,  KAPPA_BX_,
@@ -18,49 +17,37 @@ enum CoeffArray : std::size_t {
     NUM_COEFF_ARRAYS_
 };
 
-// CPML psi (auxiliary convolution) array indices (monolithic block, stride = max face size * 2):
 enum PsiArray : std::size_t {
-    PSI_EYX_,  PSI_EZX_,   // x-faces (E-field corrections)
-    PSI_EXY_,  PSI_EZY_,   // y-faces
-    PSI_EXZ_,  PSI_EYZ_,   // z-faces
-    PSI_BYX_,  PSI_BZX_,   // x-faces (B-field corrections)
-    PSI_BXY_,  PSI_BZY_,   // y-faces
-    PSI_BXZ_,  PSI_BYZ_,   // z-faces
+    PSI_EYX_,  PSI_EZX_,
+    PSI_EXY_,  PSI_EZY_,
+    PSI_EXZ_,  PSI_EYZ_,
+    PSI_BYX_,  PSI_BZX_,
+    PSI_BXY_,  PSI_BZY_,
+    PSI_BXZ_,  PSI_BYZ_,
     NUM_PSI_ARRAYS_
 };
 
 class PML {
 private:
-    // PML Region Size:
     std::size_t thickness_;
-
-    // Grid Dimensions:
     std::size_t Nx_, Ny_, Nz_;
-    std::size_t Nx_padded_, Ny_padded_, Nz_padded_;
-
-    // Grading Parameters:
+    std::size_t Nx_padded_, Ny_padded_;
     int order_;
     double sigma_max_;
     double kappa_max_;
     double alpha_max_;
 
-    // CPML Coefficients (single monolithic aligned block):
     AlignedSoA<double> coeffs_;
-
-    // Psi Arrays (single monolithic aligned block):
     AlignedSoA<double> psi_;
 
-    // Psi face sizes (each face pair stored contiguously: lo then hi):
-    std::size_t psi_face_x_;   // thickness * Ny * Nz
-    std::size_t psi_face_y_;   // Nx * thickness * Nz
-    std::size_t psi_face_z_;   // Nx * Ny * thickness
+    std::size_t psi_face_x_;
+    std::size_t psi_face_y_;
+    std::size_t psi_face_z_;
 
-    // Polynomial grading profiles (0 = interface, 1 = outer edge):
     [[nodiscard]] double sigma( double const depth_norm ) const { return sigma_max_ * std::pow( depth_norm, order_ ); }
     [[nodiscard]] double kappa( double const depth_norm ) const { return 1.0 + ( kappa_max_ - 1.0 ) * std::pow( depth_norm, order_ ); }
     [[nodiscard]] double alpha( double const depth_norm ) const { return alpha_max_ * ( 1.0 - depth_norm ); }
 
-    // Compute b and c coefficients from grading values:
     void compute_coefficients( 
         double const sigma_val, double const kappa_val, double const alpha_val,
         double const dt, double const eps,
@@ -71,7 +58,6 @@ private:
         c_out = ( denom > 1e-20 ) ? ( sigma_val / denom ) * ( b_out - 1.0 ) : 0.0;
     }
 
-    // Flattened psi index for face arrays (within a single face, lo or hi):
     [[nodiscard]] std::size_t psi_idx_x( std::size_t const d, std::size_t const y, std::size_t const z ) const { return d + thickness_ * ( y + Ny_ * z ); }
     [[nodiscard]] std::size_t psi_idx_y( std::size_t const x, std::size_t const d, std::size_t const z ) const { return x + Nx_ * ( d + thickness_ * z ); }
     [[nodiscard]] std::size_t psi_idx_z( std::size_t const x, std::size_t const y, std::size_t const d ) const { return x + Nx_ * ( y + Ny_ * d ); }
@@ -79,7 +65,6 @@ private:
 public:
     explicit PML( Simulation_Config const &config );
 
-    // Apply PML corrections after standard update:
     void update_B_psi(
         double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
         double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
@@ -93,11 +78,9 @@ public:
         double const c_sq
     );
 
-    // Getters:
     [[nodiscard]] std::size_t thickness() const { return thickness_; }
     [[nodiscard]] bool is_active() const { return thickness_ > 0; }
 
-    // Coefficient raw pointer getters:
     [[nodiscard]] double* b_Ex_ptr() { return coeffs_[B_EX_]; }
     [[nodiscard]] double* c_Ex_ptr() { return coeffs_[C_EX_]; }
     [[nodiscard]] double* kappa_Ex_ptr() { return coeffs_[KAPPA_EX_]; }
@@ -122,7 +105,6 @@ public:
     [[nodiscard]] double* c_Bz_ptr() { return coeffs_[C_BZ_]; }
     [[nodiscard]] double* kappa_Bz_ptr() { return coeffs_[KAPPA_BZ_]; }
 
-    // Immutable coefficient getters:
     [[nodiscard]] double const* b_Ex_ptr() const { return coeffs_[B_EX_]; }
     [[nodiscard]] double const* c_Ex_ptr() const { return coeffs_[C_EX_]; }
     [[nodiscard]] double const* kappa_Ex_ptr() const { return coeffs_[KAPPA_EX_]; }
@@ -147,14 +129,13 @@ public:
     [[nodiscard]] double const* c_Bz_ptr() const { return coeffs_[C_BZ_]; }
     [[nodiscard]] double const* kappa_Bz_ptr() const { return coeffs_[KAPPA_BZ_]; }
 
-    // Psi raw pointer getters (mutable):
     [[nodiscard]] double* psi_Eyx_ptr() { return psi_[PSI_EYX_]; }
     [[nodiscard]] double* psi_Ezx_ptr() { return psi_[PSI_EZX_]; }
     [[nodiscard]] double* psi_Exy_ptr() { return psi_[PSI_EXY_]; }
     [[nodiscard]] double* psi_Ezy_ptr() { return psi_[PSI_EZY_]; }
     [[nodiscard]] double* psi_Exz_ptr() { return psi_[PSI_EXZ_]; }
     [[nodiscard]] double* psi_Eyz_ptr() { return psi_[PSI_EYZ_]; }
-
+    
     [[nodiscard]] double* psi_Byx_ptr() { return psi_[PSI_BYX_]; }
     [[nodiscard]] double* psi_Bzx_ptr() { return psi_[PSI_BZX_]; }
     [[nodiscard]] double* psi_Bxy_ptr() { return psi_[PSI_BXY_]; }
@@ -162,16 +143,12 @@ public:
     [[nodiscard]] double* psi_Bxz_ptr() { return psi_[PSI_BXZ_]; }
     [[nodiscard]] double* psi_Byz_ptr() { return psi_[PSI_BYZ_]; }
 
-    // Psi face sizes (single face, before lo+hi offset):
     [[nodiscard]] std::size_t psi_face_x() const { return psi_face_x_; }
     [[nodiscard]] std::size_t psi_face_y() const { return psi_face_y_; }
     [[nodiscard]] std::size_t psi_face_z() const { return psi_face_z_; }
 
-    // Grid-index helper (same layout as Grid):
     [[nodiscard]] std::size_t idx(
-        std::size_t const x,
-        std::size_t const y,
-        std::size_t const z
+        std::size_t const x, std::size_t const y, std::size_t const z
     ) const {
         return x + Nx_padded_ * ( y + Ny_padded_ * z );
     }

@@ -51,6 +51,8 @@ file(GLOB_RECURSE LIB_SOURCES
     src/Classes/Grid/*.cpp
     src/Classes/Source/*.cpp
     src/Classes/PML/*.cpp
+    src/Classes/Write_Output/*.cpp
+    src/Classes/Validation/*.cpp
 )
 
 add_library(fdtd_core STATIC ${LIB_SOURCES})
@@ -135,8 +137,6 @@ endif()
 
 file(GLOB_RECURSE SIM_SOURCES
     src/Classes/Simulation/*.cpp
-    src/Classes/Write_Output/*.cpp
-    src/Classes/Validation/*.cpp
 )
 
 add_executable(main src/main.cpp ${SIM_SOURCES})
@@ -200,27 +200,33 @@ if(BUILD_TESTS)
     endif()
 
     # CTest targets — one per suite for granular reporting:
-    add_test(NAME test_AlignedSoA   COMMAND run_tests AlignedSoA)
-    add_test(NAME test_Grid         COMMAND run_tests Grid)
-    add_test(NAME test_Source       COMMAND run_tests Source)
-    add_test(NAME test_PML          COMMAND run_tests PML)
-    add_test(NAME test_Integration  COMMAND run_tests Integration)
-    add_test(NAME test_AllTests     COMMAND run_tests)
+    add_test(NAME test_AlignedSoA       COMMAND run_tests AlignedSoA)
+    add_test(NAME test_Grid             COMMAND run_tests Grid)
+    add_test(NAME test_Source           COMMAND run_tests Source)
+    add_test(NAME test_PML             COMMAND run_tests PML)
+    add_test(NAME test_Integration      COMMAND run_tests Integration)
+    add_test(NAME test_Output           COMMAND run_tests Output)
+    add_test(NAME test_ValidationClass  COMMAND run_tests ValidationClass)
+    add_test(NAME test_AllTests         COMMAND run_tests)
 
     if(IS_DEBUG)
         set_tests_properties(test_AlignedSoA PROPERTIES TIMEOUT 60)
         set_tests_properties(test_Grid       PROPERTIES TIMEOUT 60)
         set_tests_properties(test_Source     PROPERTIES TIMEOUT 60)
-        set_tests_properties(test_PML        PROPERTIES TIMEOUT 300)
-        set_tests_properties(test_Integration PROPERTIES TIMEOUT 300)
-        set_tests_properties(test_AllTests   PROPERTIES TIMEOUT 300)
+        set_tests_properties(test_Output     PROPERTIES TIMEOUT 60)
+        set_tests_properties(test_PML             PROPERTIES TIMEOUT 300)
+        set_tests_properties(test_Integration     PROPERTIES TIMEOUT 600)
+        set_tests_properties(test_ValidationClass PROPERTIES TIMEOUT 300)
+        set_tests_properties(test_AllTests        PROPERTIES TIMEOUT 600)
     else()
         set_tests_properties(test_AlignedSoA PROPERTIES TIMEOUT 30)
         set_tests_properties(test_Grid       PROPERTIES TIMEOUT 30)
         set_tests_properties(test_Source     PROPERTIES TIMEOUT 30)
-        set_tests_properties(test_PML        PROPERTIES TIMEOUT 30)
-        set_tests_properties(test_Integration PROPERTIES TIMEOUT 120)
-        set_tests_properties(test_AllTests   PROPERTIES TIMEOUT 120)
+        set_tests_properties(test_Output     PROPERTIES TIMEOUT 30)
+        set_tests_properties(test_PML             PROPERTIES TIMEOUT 30)
+        set_tests_properties(test_Integration     PROPERTIES TIMEOUT 300)
+        set_tests_properties(test_ValidationClass PROPERTIES TIMEOUT 120)
+        set_tests_properties(test_AllTests        PROPERTIES TIMEOUT 300)
     endif()
 endif()
 

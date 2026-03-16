@@ -7,6 +7,7 @@
 #include <numbers>
 #include <vector>
 #include <numeric>
+#include <omp.h>
 
 // ============================================================================
 // Leapfrog Update Correctness
@@ -661,4 +662,221 @@ TEST(Integration, HertzianDipole1OverR) {
 
     ASSERT_GT( ratio_measured, ratio_expected * 0.65 );
     ASSERT_LT( ratio_measured, ratio_expected * 1.50 );
+}
+
+// ============================================================================
+// Second-Order Convergence Rate
+// ============================================================================
+
+// Measure numerical phase velocity error by tracking zero-crossings at a probe.
+// The probe sees a sinusoidal signal; we extract the effective period from
+// zero-crossings and compare to the analytical period T = wavelength / c.
+// Returns |v_numerical/c - 1|.
+static double measure_phase_velocity_error( double wavelength_cells, std::size_t num_steps ) {
+    Simulation_Config cfg{};
+    Grid grid{ cfg };
+
+    double const wavelength = wavelength_cells * grid.dx();
+    double const k = 2.0 * std::numbers::pi / wavelength;
+
+    std::size_t const margin{ 15 };
+    for ( std::size_t z = margin; z < grid.Nz() - margin; ++z ) {
+        for ( std::size_t y = margin; y < grid.Ny() - margin; ++y ) {
+            for ( std::size_t x = margin; x < grid.Nx() - margin; ++x ) {
+                double phase = k * static_cast<double>(x) * grid.dx();
+                std::size_t i = grid.idx(x, y, z);
+                grid.Ey_ptr()[i] = std::sin( phase );
+                grid.Bz_ptr()[i] = std::sin( phase ) / grid.c();
+            }
+        }
+    }
+
+    std::size_t const px{50}, py{50}, pz{50};
+
+    // Record Ey at probe over time:
+    std::vector<double> probe;
+    probe.reserve( num_steps );
+
+    for ( std::size_t t = 0; t < num_steps; ++t ) {
+        probe.push_back( grid.Ey_ptr()[ grid.idx(px, py, pz) ] );
+        grid.step();
+    }
+
+    // Find upward zero-crossings with linear interpolation:
+    std::vector<double> crossings;
+    for ( std::size_t i = 1; i < probe.size(); ++i ) {
+        if ( probe[i-1] < 0.0 && probe[i] >= 0.0 ) {
+            double frac = -probe[i-1] / ( probe[i] - probe[i-1] );
+            crossings.push_back( static_cast<double>(i-1) + frac );
+        }
+    }
+
+    if ( crossings.size() < 2 ) return -1.0;
+
+    // Average period from consecutive crossings:
+    double total_period{0};
+    for ( std::size_t i = 1; i < crossings.size(); ++i ) {
+        total_period += crossings[i] - crossings[i-1];
+    }
+    double avg_period_steps = total_period / static_cast<double>( crossings.size() - 1 );
+    double avg_period_time = avg_period_steps * grid.dt();
+
+    // Phase velocity error:
+    double v_num = wavelength / avg_period_time;
+    return std::abs( v_num / grid.c() - 1.0 );
+}
+
+TEST(Integration, SecondOrderConvergenceRate) {
+    // The Yee scheme is second-order in space. Halving the number of points
+    // per wavelength should quadruple the phase velocity error.
+    //
+    // We test at 10 and 20 cells/wavelength (wavelengths of 10 and 20 cells).
+    // Both are short enough to avoid PML contamination and long enough to
+    // produce multiple zero-crossings in 500 steps.
+    //
+    // Expected: err(10) / err(20) ≈ 4.0
+
+    std::size_t const steps{ 500 };
+
+    double err_coarse = measure_phase_velocity_error( 10.0, steps );  // 10 pts/lambda
+    double err_fine   = measure_phase_velocity_error( 20.0, steps );  // 20 pts/lambda
+
+    ASSERT_GT( err_coarse, 0.0 );
+    ASSERT_GT( err_fine, 0.0 );
+
+    // Coarse should have more error:
+    ASSERT_GT( err_coarse, err_fine );
+
+    // Convergence ratio should be approximately 4 (second-order):
+    double ratio = err_coarse / err_fine;
+    ASSERT_GT( ratio, 3.0 );
+    ASSERT_LT( ratio, 5.5 );
+}
+
+// ============================================================================
+// OpenMP Thread Determinism
+// ============================================================================
+
+// Helper: run a short simulation with a given thread count and return final energy
+// plus a field sample. Uses a Gaussian pulse source and 50 steps.
+struct ThreadTestResult {
+    double energy;
+    double field_sample;
+};
+
+static ThreadTestResult run_with_threads( int num_threads ) {
+    omp_set_num_threads( num_threads );
+
+    Simulation_Config cfg{};
+    Grid grid{ cfg };
+
+    grid.add_source( std::make_unique<Gaussian_Pulse>(
+        10.0, grid.dt() * 10.0, grid.dt() * 4.0, 50, 50, 50 ) );
+
+    for ( std::size_t t = 0; t < 50; ++t ) {
+        grid.apply_sources( t );
+        grid.step();
+    }
+
+    return { grid.total_energy(), grid.Ey_ptr()[ grid.idx(60, 50, 50) ] };
+}
+
+TEST(Integration, ThreadDeterminism) {
+    // The same simulation should produce identical (or near-identical) results
+    // regardless of thread count. OpenMP parallel loops with static scheduling
+    // should give deterministic work partitioning, and reductions should produce
+    // bit-identical results if the reduction tree is consistent.
+    //
+    // Compare 1 thread vs 2 threads vs max threads. Both total energy and a
+    // specific field value are checked.
+
+    int const max_threads = omp_get_max_threads();
+
+    ThreadTestResult r1 = run_with_threads( 1 );
+    ThreadTestResult r2 = run_with_threads( 2 );
+    ThreadTestResult rm = run_with_threads( max_threads );
+
+    ASSERT_GT( r1.energy, 0.0 );
+
+    // Field updates use static scheduling and no reductions, so the field values
+    // should be bit-identical across thread counts. Energy uses omp reduction
+    // which may reorder additions — allow tiny tolerance:
+    double energy_tol = r1.energy * 1e-10;
+    ASSERT_NEAR( r1.energy, r2.energy, energy_tol );
+    ASSERT_NEAR( r1.energy, rm.energy, energy_tol );
+
+    // Field sample should match more tightly (no reduction involved):
+    double field_tol = std::abs(r1.field_sample) * 1e-12 + 1e-20;
+    ASSERT_NEAR( r1.field_sample, r2.field_sample, field_tol );
+    ASSERT_NEAR( r1.field_sample, rm.field_sample, field_tol );
+
+    // Restore:
+    omp_set_num_threads( max_threads );
+}
+
+// ============================================================================
+// Superposition (Linearity)
+// ============================================================================
+
+TEST(Integration, Superposition) {
+    // Maxwell's equations are linear: the field from two sources should equal
+    // the sum of the fields from each source independently. Run three simulations:
+    //   A: source at (40, 50, 50) only
+    //   B: source at (60, 50, 50) only
+    //   C: both sources simultaneously
+    // Verify: field_C ≈ field_A + field_B at several probe points.
+
+    Simulation_Config cfg{};
+
+    double const amp = 5.0;
+    double const t0 = cfg.dt * 10.0;  // use cfg.dt since grid isn't constructed yet
+    double const width = cfg.dt * 4.0;
+    std::size_t const xa = 40, xb = 60, y = 50, z = 50;
+    std::size_t const num_steps = 40;
+
+    // Helper: run a simulation with given sources and return Ey at probe points
+    struct ProbeResult {
+        double Ey_at_45;
+        double Ey_at_50;
+        double Ey_at_55;
+        double Ey_at_65;
+    };
+
+    auto run_sim = [&]( bool use_A, bool use_B ) -> ProbeResult {
+        Grid grid{ cfg };
+        if ( use_A ) {
+            grid.add_source( std::make_unique<Gaussian_Pulse>( amp, t0, width, xa, y, z ) );
+        }
+        if ( use_B ) {
+            grid.add_source( std::make_unique<Gaussian_Pulse>( amp, t0, width, xb, y, z ) );
+        }
+        for ( std::size_t t = 0; t < num_steps; ++t ) {
+            grid.apply_sources( t );
+            grid.step();
+        }
+        return {
+            grid.Ey_ptr()[ grid.idx(45, 50, 50) ],
+            grid.Ey_ptr()[ grid.idx(50, 50, 50) ],
+            grid.Ey_ptr()[ grid.idx(55, 50, 50) ],
+            grid.Ey_ptr()[ grid.idx(65, 50, 50) ]
+        };
+    };
+
+    ProbeResult rA = run_sim( true, false );
+    ProbeResult rB = run_sim( false, true );
+    ProbeResult rC = run_sim( true, true );
+
+    // At each probe, field_C should equal field_A + field_B:
+    double tol_45 = std::max( std::abs(rA.Ey_at_45 + rB.Ey_at_45) * 1e-10, 1e-20 );
+    double tol_50 = std::max( std::abs(rA.Ey_at_50 + rB.Ey_at_50) * 1e-10, 1e-20 );
+    double tol_55 = std::max( std::abs(rA.Ey_at_55 + rB.Ey_at_55) * 1e-10, 1e-20 );
+    double tol_65 = std::max( std::abs(rA.Ey_at_65 + rB.Ey_at_65) * 1e-10, 1e-20 );
+
+    ASSERT_NEAR( rC.Ey_at_45, rA.Ey_at_45 + rB.Ey_at_45, tol_45 );
+    ASSERT_NEAR( rC.Ey_at_50, rA.Ey_at_50 + rB.Ey_at_50, tol_50 );
+    ASSERT_NEAR( rC.Ey_at_55, rA.Ey_at_55 + rB.Ey_at_55, tol_55 );
+    ASSERT_NEAR( rC.Ey_at_65, rA.Ey_at_65 + rB.Ey_at_65, tol_65 );
+
+    // Sanity: fields should be nonzero (sources actually fired):
+    ASSERT_GT( std::abs(rC.Ey_at_45), 1e-10 );
 }
