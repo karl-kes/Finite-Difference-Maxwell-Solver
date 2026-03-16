@@ -5,3 +5,6 @@ output
 .venv
 venv
 build
+build_debug
+build_release
+build_test

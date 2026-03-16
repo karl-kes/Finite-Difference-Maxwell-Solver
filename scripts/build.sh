@@ -1,47 +1,34 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
-MODE="${1:-release}"
-BUILD_DIR="build"
-JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
 
-case "${MODE,,}" in
-    release|r)
-        BUILD_TYPE="Release"
-        ;;
-    debug|d)
-        BUILD_TYPE="Debug"
-        ;;
-    clean)
-        echo "Cleaning build directory..."
-        rm -rf "$BUILD_DIR"
-        echo "Done."
-        exit 0
-        ;;
-    *)
-        echo "Usage: $0 [release|debug|clean]"
-        exit 1
-        ;;
-esac
+JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-echo "=== $BUILD_TYPE Build ==="
+for MODE in Debug Test Release; do
+    DIR="build_$(echo "$MODE" | tr '[:upper:]' '[:lower:]')"
 
-# Configure (only if needed or build type changed):
-if [ ! -f "$BUILD_DIR/CMakeCache.txt" ] || \
-   ! grep -q "CMAKE_BUILD_TYPE:STRING=$BUILD_TYPE" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
-    echo "Configuring ($BUILD_TYPE)..."
-    rm -rf "$BUILD_DIR"
-    cmake -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
-fi
+    echo ""
+    echo "================================"
+    echo "  Building: $MODE -> $DIR"
+    echo "================================"
 
-# Build:
-echo "Building with $JOBS threads..."
-cmake --build "$BUILD_DIR" -j "$JOBS"
+    rm -rf "$DIR"
+    cmake -B "$DIR" -DCMAKE_BUILD_TYPE="$MODE"
+    cmake --build "$DIR" -j"$JOBS"
+
+    if [ "$MODE" != "Release" ]; then
+        echo ""
+        echo "--- Running tests ($MODE) ---"
+        ctest --test-dir "$DIR" --output-on-failure
+    fi
+done
 
 echo ""
-echo "=== Build Complete ==="
-echo "Binary: $BUILD_DIR/main"
-
-# Run:
-echo ""
-"./$BUILD_DIR/main"
+echo "================================"
+echo "  All builds complete."
+echo "  build_debug/    -> Debug"
+echo "  build_test/     -> Test"
+echo "  build_release/  -> Release"
+echo "================================"

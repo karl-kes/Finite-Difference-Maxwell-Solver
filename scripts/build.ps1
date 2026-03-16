@@ -1,53 +1,40 @@
 $ErrorActionPreference = "Stop"
 
-$Mode = if ( $args.Count -ge 1 ) { $args[0] } else { "release" }
-$BuildDir = "build"
-$Jobs = [Environment]::ProcessorCount
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectDir = Split-Path -Parent $ScriptDir
+Set-Location $ProjectDir
 
-switch ( $Mode.ToLower() ) {
-    { $_ -in "release", "r" } { $BuildType = "Release" }
-    { $_ -in "debug",   "d" } { $BuildType = "Debug"   }
-    "clean" {
-        Write-Host "Cleaning build directory..."
-        if ( Test-Path $BuildDir ) { Remove-Item -Recurse -Force $BuildDir }
-        Write-Host "Done."
-        exit 0
-    }
-    default {
-        Write-Host "Usage: .\build.ps1 [release|debug|clean]"
-        exit 1
+$Jobs = (Get-CimInstance Win32_Processor).NumberOfLogicalProcessors
+if (-not $Jobs) { $Jobs = 4 }
+
+foreach ($Mode in @("Debug", "Test", "Release")) {
+    $Dir = "build_$($Mode.ToLower())"
+
+    Write-Host ""
+    Write-Host "================================"
+    Write-Host "  Building: $Mode -> $Dir"
+    Write-Host "================================"
+
+    if (Test-Path $Dir) { Remove-Item -Recurse -Force $Dir }
+
+    cmake -B $Dir -G "MinGW Makefiles" "-DCMAKE_BUILD_TYPE=$Mode"
+    if ($LASTEXITCODE -ne 0) { throw "cmake configure failed for $Mode" }
+
+    cmake --build $Dir -j $Jobs
+    if ($LASTEXITCODE -ne 0) { throw "cmake build failed for $Mode" }
+
+    if ($Mode -ne "Release") {
+        Write-Host ""
+        Write-Host "--- Running tests ($Mode) ---"
+        ctest --test-dir $Dir --output-on-failure
+        if ($LASTEXITCODE -ne 0) { throw "Tests failed for $Mode" }
     }
 }
-
-Write-Host "=== $BuildType Build ==="
-
-# Configure (only if needed or build type changed):
-$NeedsConfigure = $true
-$CacheFile = "$BuildDir\CMakeCache.txt"
-
-if ( Test-Path $CacheFile ) {
-    $CacheContent = Get-Content $CacheFile -Raw
-    if ( $CacheContent -match "CMAKE_BUILD_TYPE:STRING=$BuildType" ) {
-        $NeedsConfigure = $false
-    }
-}
-
-if ( $NeedsConfigure ) {
-    Write-Host "Configuring ($BuildType)..."
-    if ( Test-Path $BuildDir ) { Remove-Item -Recurse -Force $BuildDir }
-    cmake -B $BuildDir -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=$BuildType
-    if ( $LASTEXITCODE -ne 0 ) { exit $LASTEXITCODE }
-}
-
-# Build:
-Write-Host "Building with $Jobs threads..."
-cmake --build $BuildDir -j $Jobs
-if ( $LASTEXITCODE -ne 0 ) { exit $LASTEXITCODE }
 
 Write-Host ""
-Write-Host "=== Build Complete ==="
-Write-Host "Binary: $BuildDir\main.exe"
-
-# Run:
-Write-Host ""
-& ".\$BuildDir\main.exe"
+Write-Host "================================"
+Write-Host "  All builds complete."
+Write-Host "  build_debug\    -> Debug"
+Write-Host "  build_test\     -> Test"
+Write-Host "  build_release\  -> Release"
+Write-Host "================================"
