@@ -39,8 +39,15 @@ void Plane_Wave_Test::initialize() {
     }
 }
 
-Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
+Validation_Result Plane_Wave_Test::run( std::size_t num_steps ) {
     initialize();
+
+    if ( num_steps == 0 ) {
+        double const margin_dist{ static_cast<double>( grid_.Nx() / 10 ) * grid_.dx() };
+        double const travel_time{ 0.5 * margin_dist / grid_.c() };
+        num_steps = std::max( std::size_t{10},
+                              static_cast<std::size_t>( travel_time / grid_.dt() ) );
+    }
 
     double const initial_energy{ grid_.total_energy() };
 
@@ -51,11 +58,12 @@ Validation_Result Plane_Wave_Test::run( std::size_t const num_steps ) {
     double sum_product{};
     double total_phase_error{};
 
-    for ( std::size_t t = 0; t < num_steps; ++t ) {
-        std::size_t const i{ grid_.idx(probe_x_, probe_y_, probe_z_) };
+    std::size_t const probe_i{ grid_.idx(probe_x_, probe_y_, probe_z_) };
+    double const* RESTRICT Ey{ grid_.Ey_ptr() };
 
+    for ( std::size_t t = 0; t < num_steps; ++t ) {
         double const expected_Ey{ std::sin( initial_phase_ - phase_shift_per_step_ * static_cast<double>( t ) ) };
-        double const actual_Ey{ grid_.Ey_ptr()[i] };
+        double const actual_Ey{ Ey[probe_i] };
 
         sum_expected += expected_Ey;
         sum_actual += actual_Ey;
@@ -96,7 +104,8 @@ void Plane_Wave_Test::print_report( Validation_Result const &result ) const {
     std::cout << "\n<-----Plane Wave Validation Test----->\n";
     std::cout << "Grid:       " << config_.Nx << " x " << config_.Ny << " x " << config_.Nz << "\n";
     std::cout << "Wavelength: " << wavelength_ << " (" << wavelength_ / grid_.dx() << " cells)\n";
-    std::cout << "CFL Factor: " << config_.cfl_factor << "\n\n";
+    std::cout << "CFL Factor: " << config_.cfl_factor << "\n";
+    std::cout << "dt:         " << grid_.dt() << "\n\n";
     std::cout << "Results:\n";
     std::cout << "--------\n";
     std::cout << std::fixed << std::setprecision( 5 );

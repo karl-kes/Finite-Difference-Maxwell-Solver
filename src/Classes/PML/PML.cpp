@@ -42,9 +42,10 @@ PML::PML( Simulation_Config const &config )
         double const alp_E{ alpha( depth_E ) };
 
         double const depth_B{ ( d - ( static_cast<double>( i ) + 0.5 ) ) / d };
-        double const sig_B{ sigma( depth_B ) };
-        double const kap_B{ kappa( depth_B ) };
-        double const alp_B{ alpha( depth_B ) };
+        double const depth_B_clamped{ std::max( depth_B, 0.0 ) };
+        double const sig_B{ sigma( depth_B_clamped ) };
+        double const kap_B{ kappa( depth_B_clamped ) };
+        double const alp_B{ alpha( depth_B_clamped ) };
 
         compute_coefficients( sig_E, kap_E, alp_E, config.dt, config.eps, b_Ex[i], c_Ex[i] );
         compute_coefficients( sig_B, kap_B, alp_B, config.dt, config.eps, b_Bx[i], c_Bx[i] );
@@ -63,9 +64,7 @@ PML::PML( Simulation_Config const &config )
     }
 }
 
-// ── B-field PML ─────────────────────────────────────────────────────────────
-// B-update covers x,y,z in [0, N-2]. No boundary clamping needed — all PML
-// layers d in [0,t) map to valid grid indices for both lo and hi faces.
+// B-field PML
 
 void PML::update_B_psi(
     double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
@@ -104,10 +103,9 @@ void PML::update_B_psi(
     std::size_t const ny{ Ny_ };
     std::size_t const nz{ Nz_ };
 
-    // High-face base x-index:
     std::size_t const x_hi_base{ nx - 1 - t };
 
-    // ── x-faces ──
+    // x-faces
     #pragma omp parallel for collapse( 2 )
     for ( std::size_t z = 0; z < nz - 1; ++z ) {
         for ( std::size_t y = 0; y < ny - 1; ++y ) {
@@ -150,7 +148,7 @@ void PML::update_B_psi(
         }
     }
 
-    // ── y-faces ──
+    // y-faces
     std::size_t const y_hi_base{ ny - 1 - t };
 
     #pragma omp parallel for collapse( 2 )
@@ -195,7 +193,7 @@ void PML::update_B_psi(
         }
     }
 
-    // ── z-faces ──
+    // z-faces
     std::size_t const z_hi_base{ nz - 1 - t };
 
     #pragma omp parallel for collapse( 2 )
@@ -241,9 +239,7 @@ void PML::update_B_psi(
     }
 }
 
-// ── E-field PML ─────────────────────────────────────────────────────────────
-// E-update covers x,y,z in [1, N-2]. The high-face loop bound is clamped so
-// d never produces an index >= N-1, eliminating all inner-loop branches.
+// E-field PML
 
 void PML::update_E_psi(
     double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
@@ -284,9 +280,6 @@ void PML::update_E_psi(
     std::size_t const ny{ Ny_ };
     std::size_t const nz{ Nz_ };
 
-    // Clamp loop bounds: E-update valid range is [1, N-2].
-    // Low face: x = d+1, valid while d+1 <= N-2, so d < N-2.
-    // High face: x = N-t+d, valid while N-t+d <= N-2, so d <= t-2.
     std::size_t const d_max_lo_x{ std::min( t, nx - 2 ) };
     std::size_t const d_max_hi_x{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
     std::size_t const x_hi_base{ nx - t };
@@ -299,14 +292,13 @@ void PML::update_E_psi(
     std::size_t const d_max_hi_z{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
     std::size_t const z_hi_base{ nz - t };
 
-    // ── x-faces ──
+    // x-faces
     #pragma omp parallel for collapse( 2 )
     for ( std::size_t z = 1; z < nz - 1; ++z ) {
         for ( std::size_t y = 1; y < ny - 1; ++y ) {
             std::size_t const yz_grid_base{ y * Sy + z * Sz };
             std::size_t const yz_psi_base{ t * ( y + ny * z ) };
 
-            // Low x-face:
             for ( std::size_t d = 0; d < d_max_lo_x; ++d ) {
                 std::size_t const gi{ yz_grid_base + d + 1 };
                 std::size_t const pi{ yz_psi_base + d };
@@ -321,7 +313,6 @@ void PML::update_E_psi(
                 Ey[gi] -= dt_csq * pEzx[pi];
             }
 
-            // High x-face:
             for ( std::size_t d = 0; d < d_max_hi_x; ++d ) {
                 std::size_t const gi{ yz_grid_base + x_hi_base + d };
                 std::size_t const pi{ face_x + yz_psi_base + d };
@@ -340,14 +331,13 @@ void PML::update_E_psi(
         }
     }
 
-    // ── y-faces ──
+    // y-faces
     #pragma omp parallel for collapse( 2 )
     for ( std::size_t z = 1; z < nz - 1; ++z ) {
         for ( std::size_t x = 1; x < nx - 1; ++x ) {
             std::size_t const xz_grid_base{ x + z * Sz };
             std::size_t const xz_psi_base{ x + nx * t * z };
 
-            // Low y-face:
             for ( std::size_t d = 0; d < d_max_lo_y; ++d ) {
                 std::size_t const gi{ xz_grid_base + ( d + 1 ) * Sy };
                 std::size_t const pi{ xz_psi_base + nx * d };
@@ -362,7 +352,6 @@ void PML::update_E_psi(
                 Ex[gi] += dt_csq * pEzy[pi];
             }
 
-            // High y-face:
             for ( std::size_t d = 0; d < d_max_hi_y; ++d ) {
                 std::size_t const gi{ xz_grid_base + ( y_hi_base + d ) * Sy };
                 std::size_t const pi{ face_y + xz_psi_base + nx * d };
@@ -381,14 +370,13 @@ void PML::update_E_psi(
         }
     }
 
-    // ── z-faces ──
+    // z-faces
     #pragma omp parallel for collapse( 2 )
     for ( std::size_t y = 1; y < ny - 1; ++y ) {
         for ( std::size_t x = 1; x < nx - 1; ++x ) {
             std::size_t const xy_grid_base{ x + y * Sy };
             std::size_t const xy_psi_base{ x + nx * y };
 
-            // Low z-face:
             for ( std::size_t d = 0; d < d_max_lo_z; ++d ) {
                 std::size_t const gi{ xy_grid_base + ( d + 1 ) * Sz };
                 std::size_t const pi{ xy_psi_base + nx * ny * d };
@@ -403,7 +391,6 @@ void PML::update_E_psi(
                 Ex[gi] -= dt_csq * pEyz[pi];
             }
 
-            // High z-face:
             for ( std::size_t d = 0; d < d_max_hi_z; ++d ) {
                 std::size_t const gi{ xy_grid_base + ( z_hi_base + d ) * Sz };
                 std::size_t const pi{ face_z + xy_psi_base + nx * ny * d };

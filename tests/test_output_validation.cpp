@@ -146,7 +146,7 @@ TEST(ValidationClass, PlaneWaveTestPasses) {
     // Exercise the actual Plane_Wave_Test class and verify it reports passing.
     Simulation_Config cfg{};
     Plane_Wave_Test test{ cfg };
-    Validation_Result result = test.run( 100 );
+    Validation_Result result = test.run();
 
     ASSERT_TRUE( result.passed );
     ASSERT_LT( result.energy_drift_percent, 5.0 );
@@ -158,7 +158,7 @@ TEST(ValidationClass, MetricsPhysicallyReasonable) {
     // The validation metrics should be in physically sensible ranges.
     Simulation_Config cfg{};
     Plane_Wave_Test test{ cfg };
-    Validation_Result result = test.run( 100 );
+    Validation_Result result = test.run();
 
     // Energy drift should be positive (it's defined as |final-initial|/initial):
     ASSERT_GT( result.energy_drift_percent, 0.0 );

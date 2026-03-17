@@ -36,6 +36,6 @@ public:
     explicit Plane_Wave_Test( Simulation_Config const &cfg );
 
     void initialize();
-    Validation_Result run( std::size_t const num_steps = 100 );
+    Validation_Result run( std::size_t num_steps = 0 );
     void print_report( Validation_Result const &result ) const;
 };

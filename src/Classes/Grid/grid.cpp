@@ -40,8 +40,6 @@ void Grid::apply_sources( std::size_t const time_step ) {
 }
 
 void Grid::update_B() {
-    // dB/dt = -curl(E)
-
     double* RESTRICT Bx{ Bx_ptr() };
     double* RESTRICT By{ By_ptr() };
     double* RESTRICT Bz{ Bz_ptr() };
@@ -94,8 +92,6 @@ void Grid::update_B() {
 }
 
 void Grid::update_E() {
-    // dE/dt = c^2 * curl(B) - J/eps
-
     double* RESTRICT Bx{ Bx_ptr() };
     double* RESTRICT By{ By_ptr() };
     double* RESTRICT Bz{ Bz_ptr() };

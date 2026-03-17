@@ -11,9 +11,9 @@ TEST(PML, ActiveWhenConfigured) {
     Simulation_Config cfg{};
     PML pml{ cfg };
 
-    // Default config has use_pml=true, thickness=8:
+    // Default config has use_pml=true
     ASSERT_TRUE( pml.is_active() );
-    ASSERT_EQ( pml.thickness(), std::size_t{8} );
+    ASSERT_EQ( pml.thickness(), std::size_t{cfg.pml_thickness} );
 }
 
 TEST(PML, CoefficientsInValidRange) {

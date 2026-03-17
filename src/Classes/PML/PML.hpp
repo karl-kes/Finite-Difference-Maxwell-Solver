@@ -53,8 +53,9 @@ private:
         double const dt, double const eps,
         double &b_out, double &c_out
     ) const {
-        double const denom{ kappa_val * ( sigma_val + kappa_val * alpha_val ) };
+        // Roden-Gedney CPML coefficients:
         b_out = std::exp( -( sigma_val / kappa_val + alpha_val ) * dt / eps );
+        double const denom{ sigma_val + kappa_val * alpha_val };
         c_out = ( denom > 1e-20 ) ? ( sigma_val / denom ) * ( b_out - 1.0 ) : 0.0;
     }
 
@@ -81,6 +82,7 @@ public:
     [[nodiscard]] std::size_t thickness() const { return thickness_; }
     [[nodiscard]] bool is_active() const { return thickness_ > 0; }
 
+    // Per-layer PML coefficients (length = thickness):
     [[nodiscard]] double* b_Ex_ptr() { return coeffs_[B_EX_]; }
     [[nodiscard]] double* c_Ex_ptr() { return coeffs_[C_EX_]; }
     [[nodiscard]] double* kappa_Ex_ptr() { return coeffs_[KAPPA_EX_]; }
