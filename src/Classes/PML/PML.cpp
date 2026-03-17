@@ -99,6 +99,20 @@ void PML::update_B_psi(
     double* RESTRICT pBxz{ psi_Bxz_ptr() };
     double* RESTRICT pByz{ psi_Byz_ptr() };
 
+    ASSUME_ALIGNED(bBx, SIMD_BYTES);
+    ASSUME_ALIGNED(cBx, SIMD_BYTES);
+    ASSUME_ALIGNED(bBy, SIMD_BYTES);
+    ASSUME_ALIGNED(cBy, SIMD_BYTES);
+    ASSUME_ALIGNED(bBz, SIMD_BYTES);
+    ASSUME_ALIGNED(cBz, SIMD_BYTES);
+
+    ASSUME_ALIGNED(pByx, SIMD_BYTES);
+    ASSUME_ALIGNED(pBzx, SIMD_BYTES);
+    ASSUME_ALIGNED(pBxy, SIMD_BYTES);
+    ASSUME_ALIGNED(pBzy, SIMD_BYTES);
+    ASSUME_ALIGNED(pBxz, SIMD_BYTES);
+    ASSUME_ALIGNED(pByz, SIMD_BYTES);
+
     std::size_t const nx{ Nx_ };
     std::size_t const ny{ Ny_ };
     std::size_t const nz{ Nz_ };
@@ -275,6 +289,20 @@ void PML::update_E_psi(
     double* RESTRICT pEzy{ psi_Ezy_ptr() };
     double* RESTRICT pExz{ psi_Exz_ptr() };
     double* RESTRICT pEyz{ psi_Eyz_ptr() };
+
+    ASSUME_ALIGNED(bEx, SIMD_BYTES);
+    ASSUME_ALIGNED(cEx, SIMD_BYTES);
+    ASSUME_ALIGNED(bEy, SIMD_BYTES);
+    ASSUME_ALIGNED(cEy, SIMD_BYTES);
+    ASSUME_ALIGNED(bEz, SIMD_BYTES);
+    ASSUME_ALIGNED(cEz, SIMD_BYTES);
+
+    ASSUME_ALIGNED(pEyx, SIMD_BYTES);
+    ASSUME_ALIGNED(pEzx, SIMD_BYTES);
+    ASSUME_ALIGNED(pExy, SIMD_BYTES);
+    ASSUME_ALIGNED(pEzy, SIMD_BYTES);
+    ASSUME_ALIGNED(pExz, SIMD_BYTES);
+    ASSUME_ALIGNED(pEyz, SIMD_BYTES);
 
     std::size_t const nx{ Nx_ };
     std::size_t const ny{ Ny_ };

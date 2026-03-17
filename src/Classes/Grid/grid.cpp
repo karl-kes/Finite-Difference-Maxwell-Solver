@@ -43,9 +43,18 @@ void Grid::update_B() {
     double* RESTRICT Bx{ Bx_ptr() };
     double* RESTRICT By{ By_ptr() };
     double* RESTRICT Bz{ Bz_ptr() };
+
     double* RESTRICT Ex{ Ex_ptr() };
     double* RESTRICT Ey{ Ey_ptr() };
     double* RESTRICT Ez{ Ez_ptr() };
+
+    ASSUME_ALIGNED(Ex, SIMD_BYTES);
+    ASSUME_ALIGNED(Ey, SIMD_BYTES);
+    ASSUME_ALIGNED(Ez, SIMD_BYTES);
+
+    ASSUME_ALIGNED(Bx, SIMD_BYTES);
+    ASSUME_ALIGNED(By, SIMD_BYTES);
+    ASSUME_ALIGNED(Bz, SIMD_BYTES);
 
     double const dt_local{ dt_ };
     double const inv_dx{ 1.0 / dx_ };
@@ -95,12 +104,26 @@ void Grid::update_E() {
     double* RESTRICT Bx{ Bx_ptr() };
     double* RESTRICT By{ By_ptr() };
     double* RESTRICT Bz{ Bz_ptr() };
+
     double* RESTRICT Ex{ Ex_ptr() };
     double* RESTRICT Ey{ Ey_ptr() };
     double* RESTRICT Ez{ Ez_ptr() };
+
     double* RESTRICT Jx{ Jx_ptr() };
     double* RESTRICT Jy{ Jy_ptr() };
     double* RESTRICT Jz{ Jz_ptr() };
+
+    ASSUME_ALIGNED(Ex, SIMD_BYTES);
+    ASSUME_ALIGNED(Ey, SIMD_BYTES);
+    ASSUME_ALIGNED(Ez, SIMD_BYTES);
+
+    ASSUME_ALIGNED(Bx, SIMD_BYTES);
+    ASSUME_ALIGNED(By, SIMD_BYTES);
+    ASSUME_ALIGNED(Bz, SIMD_BYTES);
+
+    ASSUME_ALIGNED(Jx, SIMD_BYTES);
+    ASSUME_ALIGNED(Jy, SIMD_BYTES);
+    ASSUME_ALIGNED(Jz, SIMD_BYTES);
 
     double const dt_local{ dt_ };
     double const csq{ c_sq_ };
