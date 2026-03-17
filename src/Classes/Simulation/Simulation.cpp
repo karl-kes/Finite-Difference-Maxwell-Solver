@@ -41,13 +41,13 @@ void Simulation::run() {
     auto const start_time{ std::chrono::high_resolution_clock::now() };
 
     // Simulation Loop:
-    for ( std::size_t curr_time{1}; curr_time <= config_.total_time; ++curr_time ) {
+    for ( std::size_t curr_time{1}; curr_time <= config_.total_steps; ++curr_time ) {
         grid_.apply_sources( curr_time );
         grid_.step();
 
         if ( ( curr_time % output_interval ) == 0 ) {
             output_.write_field( grid_, curr_time );
-            print_progress( curr_time, config_.total_time );
+            print_progress( curr_time, config_.total_steps );
         }
     }
 
@@ -59,5 +59,5 @@ void Simulation::run() {
     std::cout << "\n\nResults:\n";
     std::cout << "--------\n";
     std::cout << "Duration: " << duration.count() << " ms\n";
-    std::cout << "Physical time: " << static_cast<double>( config_.total_time ) * grid_.dt() << " s\n";
+    std::cout << "Physical time: " << static_cast<double>( config_.total_steps ) * grid_.dt() << " s\n";
 }
