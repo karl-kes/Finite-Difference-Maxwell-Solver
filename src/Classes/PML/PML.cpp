@@ -106,13 +106,6 @@ void PML::update_B_psi(
     ASSUME_ALIGNED(bBz, SIMD_BYTES);
     ASSUME_ALIGNED(cBz, SIMD_BYTES);
 
-    ASSUME_ALIGNED(pByx, SIMD_BYTES);
-    ASSUME_ALIGNED(pBzx, SIMD_BYTES);
-    ASSUME_ALIGNED(pBxy, SIMD_BYTES);
-    ASSUME_ALIGNED(pBzy, SIMD_BYTES);
-    ASSUME_ALIGNED(pBxz, SIMD_BYTES);
-    ASSUME_ALIGNED(pByz, SIMD_BYTES);
-
     std::size_t const nx{ Nx_ };
     std::size_t const ny{ Ny_ };
     std::size_t const nz{ Nz_ };
@@ -296,14 +289,7 @@ void PML::update_E_psi(
     ASSUME_ALIGNED(cEy, SIMD_BYTES);
     ASSUME_ALIGNED(bEz, SIMD_BYTES);
     ASSUME_ALIGNED(cEz, SIMD_BYTES);
-
-    ASSUME_ALIGNED(pEyx, SIMD_BYTES);
-    ASSUME_ALIGNED(pEzx, SIMD_BYTES);
-    ASSUME_ALIGNED(pExy, SIMD_BYTES);
-    ASSUME_ALIGNED(pEzy, SIMD_BYTES);
-    ASSUME_ALIGNED(pExz, SIMD_BYTES);
-    ASSUME_ALIGNED(pEyz, SIMD_BYTES);
-
+    
     std::size_t const nx{ Nx_ };
     std::size_t const ny{ Ny_ };
     std::size_t const nz{ Nz_ };

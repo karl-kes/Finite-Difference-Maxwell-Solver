@@ -20,20 +20,29 @@ Plane_Wave_Test::Plane_Wave_Test( Simulation_Config const &cfg )
 { }
 
 void Plane_Wave_Test::initialize() {
-    std::size_t const margin{ grid_.Nx() / 10 };
+    std::size_t const margin{ grid_.Nx() / 8 };
 
     double* RESTRICT Ey{ grid_.Ey_ptr() };
     double* RESTRICT Bz{ grid_.Bz_ptr() };
 
-    #pragma omp parallel for collapse( 3 )
-    for ( std::size_t z = margin; z < grid_.Nz() - margin; ++z ) {
-        for ( std::size_t y = margin; y < grid_.Ny() - margin; ++y ) {
-            for ( std::size_t x = margin; x < grid_.Nx() - margin; ++x ) {
-                double const phase{ wavenumber_ * static_cast<double>( x ) * grid_.dx() };
+    std::size_t Nx_end{grid_.Nx() - margin};
+    std::size_t Ny_end{grid_.Ny() - margin};
+    std::size_t Nz_end{grid_.Nz() - margin};
+
+    double const inv_c{ 1.0 / grid_.c() };
+    double const dx_local{ grid_.dx() };
+
+    #pragma omp parallel for collapse( 2 )
+    for ( std::size_t z = margin; z < Nz_end - margin; ++z ) {
+        for ( std::size_t y = margin; y < Ny_end - margin; ++y ) {
+
+            #pragma omp simd
+            for ( std::size_t x = margin; x < Nx_end; ++x ) {
+                double const phase{ wavenumber_ * static_cast<double>( x ) * dx_local };
                 std::size_t const i{ grid_.idx(x,y,z) };
 
                 Ey[i] = std::sin( phase );
-                Bz[i] = std::sin( phase ) / grid_.c();
+                Bz[i] = std::sin( phase ) * inv_c;
             }
         }
     }

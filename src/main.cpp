@@ -6,27 +6,11 @@
 #include "Classes/Simulation/Simulation.hpp"
 #include "Classes/Validation/Validation.hpp"
 
-/* 
-    To compile and run:
-
-    # DEBUG MODE:
-    rm -r build
-    cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Debug
-    cmake --build build
-    ./build/main.exe
-
-    # RELEASE MODE:
-    rm -r build
-    cmake -B build -G "MinGW Makefiles"
-    cmake --build build
-    ./build/main.exe
-
-    # RENDER:
-    python ./src/render.py
-*/
-
 int main() {
-    Simulation_Config config{};
+    // Config setup:
+    std::string const config_path{ "config.cfg" };
+    Simulation_Config config{ Simulation_Config::from_file( config_path ) };
+
     Simulation sim{ config };
 
     // Validation:
