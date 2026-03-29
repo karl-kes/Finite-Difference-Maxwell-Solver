@@ -4,7 +4,7 @@
 #include "../src/Classes/Grid/grid.hpp"
 #include "../src/Classes/Source/source.hpp"
 #include "../src/Classes/Write_Output/output.hpp"
-#include "../src/Classes/Validation/Validation.hpp"
+#include "../src/Classes/Validation/validation.hpp"
 #include <cmath>
 #include <numbers>
 #include <fstream>
@@ -22,11 +22,6 @@ TEST(Output, BinaryRoundTrip) {
     Simulation_Config cfg{};
     Grid grid{ cfg };
 
-    // Set a known pattern: Ey = x-index at every cell, everything else zero.
-    // This makes the Yee-averaged Ey at cell (x,y,z) = 0.5*(x + (x+1)) = x + 0.5
-    // (since Ey is averaged along y, but we set uniform in y, so it's just Ey[i]).
-    // Actually, Ey is averaged along y: 0.5*(Ey[x,y,z] + Ey[x,y+1,z]).
-    // If Ey = x everywhere, then avg = x. Let's use that.
     for ( std::size_t z = 0; z < grid.Nz(); ++z ) {
         for ( std::size_t y = 0; y < grid.Ny(); ++y ) {
             for ( std::size_t x = 0; x < grid.Nx(); ++x ) {

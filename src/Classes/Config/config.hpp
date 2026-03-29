@@ -34,7 +34,7 @@ public:
     double mu{ 1.0 };
     double eps{ 1.0 };
 
-    double cfl_factor{ 0.75 };
+    double cfl_factor{ 1.0 };
     std::size_t total_steps{ 1000 };
 
     bool run_validation{ true };

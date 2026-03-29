@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Config/config.hpp"
-#include "../../Utilities/AlignedSoA.hpp"
+#include "../../Utilities/aligned_soa.hpp"
 
 #include <cmath>
 #include <cstddef>

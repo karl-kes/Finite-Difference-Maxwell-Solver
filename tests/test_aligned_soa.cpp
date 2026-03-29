@@ -1,5 +1,5 @@
 #include "test_framework.hpp"
-#include "../src/Utilities/AlignedSoA.hpp"
+#include "../src/Utilities/aligned_soa.hpp"
 #include <cstdint>
 
 // ============================================================================

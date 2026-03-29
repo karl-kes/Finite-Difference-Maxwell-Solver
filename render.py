@@ -122,6 +122,9 @@ rr.log("world/bounds", rr.Boxes3D(
     colors=[[80, 80, 80, 40]],
 ), static=True)
 
+# Initialize caching variable for time-synchronization
+prev_b_total = None
+
 # Log Frames:
 print("Logging frames to Rerun...")
 
@@ -223,9 +226,21 @@ for frame_idx in range(num_frames):
     # Energy Scalars:
     e_total = float(np.sum(e_mag**2))
     b_total = float(np.sum(b_mag**2))
+    
     rr.log("plots/E_energy", rr.Scalars(e_total))
     rr.log("plots/B_energy", rr.Scalars(b_total))
-    rr.log("plots/total_energy", rr.Scalars(e_total + b_total))
+    
+    # Time-synchronized Total Energy (Interpolating B-field to match E-field time t)
+    if prev_b_total is not None:
+        # Average the B-field energy from t-0.5 (prev) and t+0.5 (current)
+        sync_b_total = (prev_b_total + b_total) / 2.0
+        rr.log("plots/total_energy", rr.Scalars(e_total + sync_b_total))
+    else:
+        # First frame fallback: just add them
+        rr.log("plots/total_energy", rr.Scalars(e_total + b_total))
+        
+    # Cache current B_total for the next frame's interpolation
+    prev_b_total = b_total
 
     if (frame_idx + 1) % 10 == 0 or frame_idx == 0:
         print(f"  Frame {frame_idx + 1}/{num_frames}")

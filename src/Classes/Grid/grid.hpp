@@ -5,8 +5,8 @@
 #include <cstddef>
 
 #include "../Config/config.hpp"
-#include "../../Utilities/AlignedSoA.hpp"
-#include "../PML/PML.hpp"
+#include "../../Utilities/aligned_soa.hpp"
+#include "../PML/pml.hpp"
 
 class Source;
 

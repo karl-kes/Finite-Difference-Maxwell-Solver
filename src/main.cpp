@@ -2,9 +2,9 @@
 #include "Classes/Grid/grid.hpp"
 #include "Classes/Source/source.hpp"
 #include "Classes/Write_Output/output.hpp"
-#include "Classes/PML/PML.hpp"
-#include "Classes/Simulation/Simulation.hpp"
-#include "Classes/Validation/Validation.hpp"
+#include "Classes/PML/pml.hpp"
+#include "Classes/Simulation/simulation.hpp"
+#include "Classes/Validation/validation.hpp"
 
 int main() {
     // Config setup:

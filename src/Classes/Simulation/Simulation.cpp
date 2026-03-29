@@ -1,4 +1,4 @@
-#include "Simulation.hpp"
+#include "simulation.hpp"
 
 #include "../Source/source.hpp"
 

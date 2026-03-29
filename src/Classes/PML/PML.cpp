@@ -1,4 +1,4 @@
-#include "PML.hpp"
+#include "pml.hpp"
 
 #include <omp.h>
 #include <algorithm>
