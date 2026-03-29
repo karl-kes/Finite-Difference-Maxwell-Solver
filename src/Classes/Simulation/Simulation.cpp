@@ -22,13 +22,11 @@ void Simulation::initialize() {
     output_.initialize();
 
     double const freq{ grid_.c() / ( 20.0 * grid_.dx() ) };
-    grid_.add_source( std::make_unique<Straight_Wire_X>(
-        10.0,                    // amplitude
+    std::size_t z{ grid_.Nz()/2 };
+    grid_.add_source( std::make_unique<AC_Current_Loop>(
+        1.0,                     // amplitude
         freq,                    // frequency
-        config_.Ny / 2,          // y position
-        config_.Nz / 2,          // z position
-        config_.Nx / 4,          // x_start
-        3 * config_.Nx / 4       // x_end
+        z                        // z-plane level
     ) );
 }
 
