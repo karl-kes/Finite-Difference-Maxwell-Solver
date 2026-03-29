@@ -34,7 +34,7 @@ public:
     double mu{ 1.0 };
     double eps{ 1.0 };
 
-    double cfl_factor{ 1.0 };
+    double cfl_factor{ 0.75 };
     std::size_t total_steps{ 1000 };
 
     bool run_validation{ true };
@@ -96,7 +96,7 @@ public:
     }
 
     [[nodiscard]] std::size_t output_interval() const {
-        return total_steps / 100;
+        return total_steps / 1000;
     }
 
 private:

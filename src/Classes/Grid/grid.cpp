@@ -126,8 +126,12 @@ void Grid::update_E() {
     ASSUME_ALIGNED(Jz, SIMD_BYTES);
 
     double const dt_local{ dt_ };
-    double const csq{ c_sq_ };
+    double const c_sq{ c_sq_ };
     double const inv_eps{ 1.0 / eps_ };
+
+    double const dt_c_sq{dt_local * c_sq};
+    double const dt_inv_eps{dt_local * inv_eps};
+
     double const inv_dx{ 1.0 / dx_ };
     double const inv_dy{ 1.0 / dy_ };
     double const inv_dz{ 1.0 / dz_ };
@@ -161,9 +165,9 @@ void Grid::update_E() {
                   - ( Bx[i] - Bx[i - Sy] ) * inv_dy
                 };
 
-                Ex[i] += dt_local * ( csq * curl_x - Jx[i] * inv_eps );
-                Ey[i] += dt_local * ( csq * curl_y - Jy[i] * inv_eps );
-                Ez[i] += dt_local * ( csq * curl_z - Jz[i] * inv_eps );
+                Ex[i] += dt_c_sq * curl_x - Jx[i] * dt_inv_eps;
+                Ey[i] += dt_c_sq * curl_y - Jy[i] * dt_inv_eps;
+                Ez[i] += dt_c_sq * curl_z - Jz[i] * dt_inv_eps;
             }
         }
     }

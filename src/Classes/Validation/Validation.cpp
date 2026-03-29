@@ -33,8 +33,8 @@ void Plane_Wave_Test::initialize() {
     double const dx_local{ grid_.dx() };
 
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = margin; z < Nz_end - margin; ++z ) {
-        for ( std::size_t y = margin; y < Ny_end - margin; ++y ) {
+    for ( std::size_t z = margin; z < Nz_end; ++z ) {
+        for ( std::size_t y = margin; y < Ny_end; ++y ) {
 
             #pragma omp simd
             for ( std::size_t x = margin; x < Nx_end; ++x ) {
