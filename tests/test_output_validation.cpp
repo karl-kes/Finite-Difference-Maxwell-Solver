@@ -33,11 +33,12 @@ TEST(Output, BinaryRoundTrip) {
     // Write:
     std::string test_dir{ "test_output_roundtrip" };
     Output output{ test_dir };
-    output.initialize();
-    output.write_field( grid, 1 );
+    output.initialize( grid );
+    output.write_field( grid );
+    output.finalize();
 
     // Read back the E-field file:
-    std::string path = output.file_name( Field::ELECTRIC, 1 );
+    std::string path{ test_dir + "/E.bin" };
     std::ifstream file( path, std::ios::binary );
     ASSERT_TRUE( file.is_open() );
 
@@ -54,7 +55,7 @@ TEST(Output, BinaryRoundTrip) {
     ASSERT_EQ( nz, grid.Nz() - 1 );
 
     // Read all data:
-    std::size_t total_floats = nx * ny * nz * 4;
+    std::size_t total_floats = nx * ny * nz * 3;
     std::vector<double> data( total_floats );
     file.read( reinterpret_cast<char*>(data.data()),
                static_cast<std::streamsize>(total_floats * sizeof(double)) );
@@ -62,16 +63,15 @@ TEST(Output, BinaryRoundTrip) {
     file.close();
 
     // Verify Yee-averaged Ey values at a few sample points.
-    // Data layout per cell: [Ex_avg, Ey_avg, Ez_avg, |E|] — 4 doubles.
+    // Data layout per cell: [Ex_avg, Ey_avg, Ez_avg] — 3 doubles.
     // Storage order: x fastest, then y, then z (matching the write loops).
     for ( std::size_t z = 10; z < 20; ++z ) {
         for ( std::size_t y = 10; y < 20; ++y ) {
             for ( std::size_t x = 10; x < 20; ++x ) {
-                std::size_t offset = ( z * ny * nx + y * nx + x ) * 4;
+                std::size_t offset = ( z * ny * nx + y * nx + x ) * 3;
                 double Ex_avg = data[offset + 0];
                 double Ey_avg = data[offset + 1];
                 double Ez_avg = data[offset + 2];
-                double E_mag  = data[offset + 3];
 
                 // Ex and Ez are zero everywhere:
                 ASSERT_NEAR( Ex_avg, 0.0, 1e-14 );
@@ -80,15 +80,12 @@ TEST(Output, BinaryRoundTrip) {
                 // Ey Yee-average: 0.5*(Ey[x,y,z] + Ey[x,y+1,z]) = 0.5*(x + x) = x
                 double expected_Ey = static_cast<double>(x);
                 ASSERT_NEAR( Ey_avg, expected_Ey, 1e-12 );
-
-                // Magnitude should equal |Ey_avg| since Ex=Ez=0:
-                ASSERT_NEAR( E_mag, std::abs(expected_Ey), 1e-12 );
             }
         }
     }
 
     // Also verify the B-field file was created:
-    std::string path_B = output.file_name( Field::MAGNETIC, 1 );
+    std::string path_B{ test_dir + "/B.bin" };
     ASSERT_TRUE( std::filesystem::exists( path_B ) );
 
     // Cleanup:
@@ -102,14 +99,17 @@ TEST(Output, HeaderDimensionsConsistent) {
 
     std::string test_dir{ "test_output_header" };
     Output output{ test_dir };
-    output.initialize();
+    output.initialize( grid );
 
     // Inject a small nonzero field so the file isn't trivially zeros:
     grid.Ey_ptr()[ grid.idx(50, 50, 50) ] = 1.0;
-    output.write_field( grid, 42 );
+    output.write_field( grid );
+    output.finalize();
 
-    for ( Field f : { Field::ELECTRIC, Field::MAGNETIC } ) {
-        std::string path = output.file_name( f, 42 );
+    std::size_t const frame_bytes{ (grid.Nx() - 1) * (grid.Ny() - 1) * (grid.Nz() - 1) * 3 * sizeof(double) };
+
+    for ( char const* name : { "/E.bin", "/B.bin" } ) {
+        std::string path{ test_dir + name };
         std::ifstream file( path, std::ios::binary );
         ASSERT_TRUE( file.is_open() );
 
@@ -120,11 +120,10 @@ TEST(Output, HeaderDimensionsConsistent) {
         ASSERT_EQ( static_cast<std::size_t>(dims[1]), grid.Ny() - 1 );
         ASSERT_EQ( static_cast<std::size_t>(dims[2]), grid.Nz() - 1 );
 
-        // File size should be header (24 bytes) + nx*ny*nz*4*8 bytes:
+        // File size should be header (24 bytes) + one frame of nx*ny*nz*3*8 bytes:
         file.seekg( 0, std::ios::end );
         auto file_size = file.tellg();
-        auto expected_size = static_cast<std::streampos>(
-            24 + dims[0] * dims[1] * dims[2] * 4 * sizeof(double) );
+        auto expected_size = static_cast<std::streampos>( 24 + frame_bytes );
         ASSERT_EQ( file_size, expected_size );
 
         file.close();
@@ -171,18 +170,6 @@ TEST(ValidationClass, MetricsPhysicallyReasonable) {
 // ============================================================================
 
 TEST(Integration, CPMLReflectionCoefficient) {
-    // Measure CPML reflection in dB by launching a narrow-band plane wave
-    // toward the high-x PML boundary and measuring the reflected amplitude
-    // at a probe behind the wavefront.
-    //
-    // Key design decisions (all derived from config):
-    //   1. Wave is tapered with a raised-cosine window to eliminate truncation
-    //      artifacts that would produce spurious leftward signals.
-    //   2. y/z margins keep the wave well inside the transverse PML.
-    //   3. The probe waits long enough for the PML reflection to arrive but
-    //      not so long that multi-bounce artifacts accumulate.
-    //   4. The dB threshold scales with PML thickness.
-
     Simulation_Config cfg{};
     Grid grid{ cfg };
 
@@ -195,18 +182,11 @@ TEST(Integration, CPMLReflectionCoefficient) {
     double const k = 2.0 * std::numbers::pi / wavelength;
     double const incident_amplitude = 1.0;
 
-    // y/z margin: well inside the transverse PML faces:
     std::size_t const yz_margin{ pml_t + 10 };
 
-    // x layout:
-    //   PML inner face (high side): nx - pml_t
-    //   Wave region: [wave_start, wave_end) with taper zones on both edges
-    //   Probe: in the left half, well separated from wave_start
     std::size_t const pml_inner_hi{ nx - pml_t };
     std::size_t const pml_inner_lo{ pml_t };
 
-    // Place the wave in the right ~60% of the interior. Leave a gap between
-    // the probe and the wave so even the tapered edge has negligible amplitude:
     std::size_t const interior_lo{ pml_inner_lo + 2 };
     std::size_t const interior_hi{ pml_inner_hi - 1 };
     std::size_t const interior_width{ interior_hi - interior_lo };
@@ -214,25 +194,20 @@ TEST(Integration, CPMLReflectionCoefficient) {
     std::size_t const wave_start{ interior_lo + interior_width * 2 / 5 };
     std::size_t const wave_end{ interior_hi };
 
-    // Taper width: 2 wavelengths (in cells) on each edge, clamped to fit:
     std::size_t const taper_cells{ std::min(
         static_cast<std::size_t>( 2.0 * wavelength / grid.dx() ),
         ( wave_end - wave_start ) / 4 ) };
 
-    // Probe x: midway between low-x PML inner face and wave_start:
     std::size_t const probe_x{ pml_inner_lo + ( wave_start - pml_inner_lo ) / 2 };
 
-    // y/z probe region — central strip:
     std::size_t const probe_y_lo{ ny * 2 / 5 };
     std::size_t const probe_y_hi{ ny * 3 / 5 };
     std::size_t const probe_z_lo{ nz * 2 / 5 };
     std::size_t const probe_z_hi{ nz * 3 / 5 };
 
-    // Initialize +x plane wave with raised-cosine taper on both x edges:
     for ( std::size_t z = yz_margin; z < nz - yz_margin; ++z ) {
         for ( std::size_t y = yz_margin; y < ny - yz_margin; ++y ) {
             for ( std::size_t x = wave_start; x < wave_end; ++x ) {
-                // Taper envelope: 1.0 in the bulk, raised-cosine at edges:
                 double envelope = 1.0;
                 if ( x < wave_start + taper_cells ) {
                     double t = static_cast<double>( x - wave_start ) / static_cast<double>( taper_cells );
@@ -250,9 +225,6 @@ TEST(Integration, CPMLReflectionCoefficient) {
         }
     }
 
-    // Step count: wave must reach high-x PML, be absorbed/reflected, and the
-    // reflection must travel back to the probe. Then add margin for the
-    // reflection to fully arrive:
     double const dist_to_pml{ static_cast<double>( wave_end - wave_start ) * grid.dx() };
     double const dist_return{ static_cast<double>( wave_start - probe_x ) * grid.dx() };
     double const travel_time{ ( dist_to_pml + dist_return ) / grid.c() };
@@ -263,7 +235,6 @@ TEST(Integration, CPMLReflectionCoefficient) {
         grid.step();
     }
 
-    // Measure peak reflected |Ey| at the probe:
     double peak_reflected{ 0 };
     for ( std::size_t z = probe_z_lo; z < probe_z_hi; ++z ) {
         for ( std::size_t y = probe_y_lo; y < probe_y_hi; ++y ) {
@@ -272,18 +243,11 @@ TEST(Integration, CPMLReflectionCoefficient) {
         }
     }
 
-    // Reflection coefficient in dB:
     double R_dB = 20.0 * std::log10( std::max( peak_reflected, 1e-30 ) / incident_amplitude );
 
-    // Threshold scales with PML thickness. Empirical baseline:
-    //   8 layers  → ~-15 dB      (conservative for high CFL)
-    //   12 layers → ~-18 dB
-    //   16 layers → ~-22 dB
-    // Use: threshold = -0.8 * thickness - 8, clamped to at most -12 dB:
     double const threshold_dB{ std::min( -12.0,
         -0.8 * static_cast<double>( pml_t ) - 8.0 ) };
     ASSERT_LT( R_dB, threshold_dB );
 
-    // Sanity: there should be some measurable reflection:
     ASSERT_GT( peak_reflected, 1e-20 );
 }

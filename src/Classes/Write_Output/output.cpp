@@ -2,100 +2,144 @@
 
 #include "../Grid/grid.hpp"
 
-#include <fstream>
 #include <stdexcept>
-#include <cstdint>
-#include <vector>
-#include <cmath>
 
-void Output::write_field( Grid const& grid, std::size_t const time_step ) const {
-    std::size_t const nx{ grid.Nx() - 1 };
-    std::size_t const ny{ grid.Ny() - 1 };
-    std::size_t const nz{ grid.Nz() - 1 };
+void Output::initialize( Grid const &grid ) {
+    std::filesystem::remove_all( base_path_ );
+    std::filesystem::create_directories( base_path_ );
 
-    std::size_t const Sx{ 1 };
-    std::size_t const Sy{ grid.Nx_padded() };
-    std::size_t const Sz{ grid.Nx_padded() * grid.Ny_padded() };
+    dimensions_[0] = static_cast<uint64_t>( grid.Nx() - 1 );
+    dimensions_[1] = static_cast<uint64_t>( grid.Ny() - 1 );
+    dimensions_[2] = static_cast<uint64_t>( grid.Nz() - 1 );
 
-    std::size_t const slab_size{ nx * ny * 4 };
-    std::vector<double> buffer( slab_size );
+    volume_size_ = static_cast<std::size_t>( dimensions_[0] )
+                 * static_cast<std::size_t>( dimensions_[1] )
+                 * static_cast<std::size_t>( dimensions_[2] ) * 3;
 
-    std::string path_E{ file_name( Field::ELECTRIC, time_step ) };
-    std::ofstream file_E( path_E, std::ios::binary | std::ios::out );
-    if ( !file_E.is_open() ) {
+    buffers_[0].resize( volume_size_ * 2 );
+    buffers_[1].resize( volume_size_ * 2 );
+    active_buf_ = 0;
+
+    nx = static_cast<std::size_t>( dimensions_[0] );
+    ny = static_cast<std::size_t>( dimensions_[1] );
+    nz = static_cast<std::size_t>( dimensions_[2] );
+
+    Sx = 1;
+    Sy = grid.Nx_padded();
+    Sz = grid.Nx_padded() * grid.Ny_padded();
+
+    std::string path_E{ base_path_ + "/E.bin" };
+    file_E_.open( path_E, std::ios::binary | std::ios::out );
+    if ( !file_E_.is_open() ) {
         throw std::runtime_error{ "Failed to open file: " + path_E };
     }
+    file_E_.write( reinterpret_cast<char const*>( dimensions_ ), sizeof( dimensions_ ) );
 
-    uint64_t const dimensions[3] = {
-        static_cast<uint64_t>( nx ),
-        static_cast<uint64_t>( ny ),
-        static_cast<uint64_t>( nz )
-    };
-    file_E.write( reinterpret_cast<char const*>( dimensions ), sizeof( dimensions ) );
+    std::string path_B{ base_path_ + "/B.bin" };
+    file_B_.open( path_B, std::ios::binary | std::ios::out );
+    if ( !file_B_.is_open() ) {
+        throw std::runtime_error{ "Failed to open file: " + path_B };
+    }
+    file_B_.write( reinterpret_cast<char const*>( dimensions_ ), sizeof( dimensions_ ) );
+
+    shutdown_ = false;
+    has_work_ = false;
+    writer_thread_ = std::thread{ &Output::writer_loop, this };
+}
+
+void Output::writer_loop() {
+    while ( true ) {
+        std::unique_lock<std::mutex> lock{ mtx_ };
+        cv_ready_.wait( lock, [this]{ return has_work_ || shutdown_; } );
+
+        if ( shutdown_ && !has_work_ ) return;
+
+        int flush_buf{ 1 - active_buf_ };
+        double const* e_ptr{ buffers_[flush_buf].data() };
+        double const* b_ptr{ buffers_[flush_buf].data() + volume_size_ };
+        std::size_t size{ volume_size_ };
+
+        lock.unlock();
+
+        flush_buffer( e_ptr, b_ptr, size );
+
+        {
+            std::lock_guard<std::mutex> done_lock{ mtx_ };
+            has_work_ = false;
+        }
+        cv_done_.notify_one();
+    }
+}
+
+void Output::write_field( Grid const &grid ) {
+    {
+        std::unique_lock<std::mutex> lock{ mtx_ };
+        cv_done_.wait( lock, [this]{ return !has_work_; } );
+    }
+
+    double* e_buf{ buffers_[active_buf_].data() };
+    double* b_buf{ buffers_[active_buf_].data() + volume_size_ };
 
     double const* RESTRICT Ex{ grid.Ex_ptr() };
     double const* RESTRICT Ey{ grid.Ey_ptr() };
     double const* RESTRICT Ez{ grid.Ez_ptr() };
 
+    std::size_t idx{ 0 };
     for ( std::size_t z = 0; z < nz; ++z ) {
-        std::size_t buf_idx{ 0 };
-
         for ( std::size_t y = 0; y < ny; ++y ) {
-            std::size_t const base{ y * Sy + z * Sz };
 
+            std::size_t const base{ y * Sy + z * Sz };
             for ( std::size_t x = 0; x < nx; ++x ) {
                 std::size_t const i{ base + x };
-
-                double const ex{ 0.5 * ( Ex[i] + Ex[i + Sx] ) };
-                double const ey{ 0.5 * ( Ey[i] + Ey[i + Sy] ) };
-                double const ez{ 0.5 * ( Ez[i] + Ez[i + Sz] ) };
-
-                buffer[buf_idx    ] = ex;
-                buffer[buf_idx + 1] = ey;
-                buffer[buf_idx + 2] = ez;
-                buffer[buf_idx + 3] = std::sqrt( ex * ex + ey * ey + ez * ez );
-                buf_idx += 4;
+                e_buf[idx    ] = 0.5 * ( Ex[i] + Ex[i + Sx] );
+                e_buf[idx + 1] = 0.5 * ( Ey[i] + Ey[i + Sy] );
+                e_buf[idx + 2] = 0.5 * ( Ez[i] + Ez[i + Sz] );
+                idx += 3;
             }
         }
-        file_E.write( reinterpret_cast<char const*>( buffer.data() ),
-                      static_cast<std::streamsize>( slab_size * sizeof( double ) ) );
     }
-    file_E.close();
-
-    std::string path_B{ file_name( Field::MAGNETIC, time_step ) };
-    std::ofstream file_B( path_B, std::ios::binary | std::ios::out );
-    if ( !file_B.is_open() ) {
-        throw std::runtime_error{ "Failed to open file: " + path_B };
-    }
-
-    file_B.write( reinterpret_cast<char const*>( dimensions ), sizeof( dimensions ) );
 
     double const* RESTRICT Bx{ grid.Bx_ptr() };
     double const* RESTRICT By{ grid.By_ptr() };
     double const* RESTRICT Bz{ grid.Bz_ptr() };
 
+    idx = 0;
     for ( std::size_t z = 0; z < nz; ++z ) {
-        std::size_t buf_idx{ 0 };
-
         for ( std::size_t y = 0; y < ny; ++y ) {
-            std::size_t const base{ y * Sy + z * Sz };
             
+            std::size_t const base{ y * Sy + z * Sz };
             for ( std::size_t x = 0; x < nx; ++x ) {
                 std::size_t const i{ base + x };
-
-                double const bx{ 0.5 * ( Bx[i] + Bx[i + Sx] ) };
-                double const by{ 0.5 * ( By[i] + By[i + Sy] ) };
-                double const bz{ 0.5 * ( Bz[i] + Bz[i + Sz] ) };
-
-                buffer[buf_idx    ] = bx;
-                buffer[buf_idx + 1] = by;
-                buffer[buf_idx + 2] = bz;
-                buffer[buf_idx + 3] = std::sqrt( bx * bx + by * by + bz * bz );
-                buf_idx += 4;
+                b_buf[idx    ] = 0.5 * ( Bx[i] + Bx[i + Sx] );
+                b_buf[idx + 1] = 0.5 * ( By[i] + By[i + Sy] );
+                b_buf[idx + 2] = 0.5 * ( Bz[i] + Bz[i + Sz] );
+                idx += 3;
             }
         }
-        file_B.write( reinterpret_cast<char const*>( buffer.data() ),
-                      static_cast<std::streamsize>( slab_size * sizeof( double ) ) );
     }
-    file_B.close();
+
+    {
+        std::lock_guard<std::mutex> lock{ mtx_ };
+        active_buf_ = 1 - active_buf_;
+        has_work_ = true;
+    }
+    cv_ready_.notify_one();
+}
+
+void Output::flush_buffer( double const* e_data, double const* b_data, std::size_t size ) {
+    auto const bytes{ static_cast<std::streamsize>( size * sizeof( double ) ) };
+    file_E_.write( reinterpret_cast<char const*>( e_data ), bytes );
+    file_B_.write( reinterpret_cast<char const*>( b_data ), bytes );
+}
+
+void Output::finalize() {
+    {
+        std::unique_lock<std::mutex> lock{ mtx_ };
+        cv_done_.wait( lock, [this]{ return !has_work_; } );
+        shutdown_ = true;
+    }
+    cv_ready_.notify_one();
+    if ( writer_thread_.joinable() ) writer_thread_.join();
+    if ( file_E_.is_open() ) file_E_.close();
+    if ( file_B_.is_open() ) file_B_.close();
 }

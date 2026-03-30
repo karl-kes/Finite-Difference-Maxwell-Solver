@@ -19,7 +19,8 @@ void Simulation::print_progress( std::size_t const current, std::size_t const to
 }
 
 void Simulation::initialize() {
-    output_.initialize();
+    // Begin Outputs:
+    output_.initialize( grid_ );
 
     double const freq{ grid_.c() / ( 20.0 * grid_.dx() ) };
     std::size_t z{ grid_.Nz()/2 };
@@ -33,10 +34,6 @@ void Simulation::initialize() {
 void Simulation::run() {
     std::cout << "<-----Maxwell Simulation----->" << std::endl;
 
-    // Run @ t = 0:
-    grid_.apply_sources();
-    grid_.step();
-
     // Run simulation and start timer:
     std::size_t const output_interval{ config_.output_interval() };
     auto const start_time{ std::chrono::high_resolution_clock::now() };
@@ -47,10 +44,13 @@ void Simulation::run() {
         grid_.step();
 
         if ( ( curr_time % output_interval ) == 0 ) {
-            output_.write_field( grid_, curr_time );
+            output_.write_field( grid_ );
             print_progress( curr_time, config_.total_steps );
         }
     }
+
+    // End Outputs:
+    output_.finalize();
 
     // End Timer:
     auto const end_time{ std::chrono::high_resolution_clock::now() };

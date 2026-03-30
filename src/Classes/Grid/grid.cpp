@@ -265,32 +265,3 @@ double Grid::total_energy() const {
     }
     return energy * dV;
 }
-
-double Grid::source_power() const {
-    double power{};
-    double const dV{ dx_ * dy_ * dz_ };
-
-    double const* RESTRICT Ex{ Ex_ptr() };
-    double const* RESTRICT Ey{ Ey_ptr() };
-    double const* RESTRICT Ez{ Ez_ptr() };
-    double const* RESTRICT Jx{ Jx_ptr() };
-    double const* RESTRICT Jy{ Jy_ptr() };
-    double const* RESTRICT Jz{ Jz_ptr() };
-
-    std::size_t const Sy{ Nx_padded_ };
-    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
-
-    #pragma omp parallel for collapse( 2 ) reduction( +:power )
-    for ( std::size_t z = 0; z < Nz_; ++z ) {
-        for ( std::size_t y = 0; y < Ny_; ++y ) {
-            std::size_t const base{ y * Sy + z * Sz };
-
-            for ( std::size_t x = 0; x < Nx_; ++x ) {
-                std::size_t const i{ base + x };
-
-                power -= Jx[i] * Ex[i] + Jy[i] * Ey[i] + Jz[i] * Ez[i];
-            }
-        }
-    }
-    return power * dV;
-}

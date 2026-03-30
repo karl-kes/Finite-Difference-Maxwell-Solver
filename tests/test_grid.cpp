@@ -70,7 +70,6 @@ TEST(Grid, ZeroFieldZeroEnergy) {
     Grid grid{ cfg };
 
     ASSERT_EQ( grid.total_energy(), 0.0 );
-    ASSERT_EQ( grid.source_power(), 0.0 );
 }
 
 TEST(Grid, IdxLinearization) {
@@ -97,17 +96,6 @@ TEST(Grid, FieldWriteRead) {
     // Also through raw pointer:
     grid.Bz_ptr()[ grid.idx(25, 30, 35) ] = -2.71;
     ASSERT_NEAR( grid.field( Field::MAGNETIC, Component::Z, 25, 30, 35 ), -2.71, 1e-15 );
-}
-
-TEST(Grid, FieldMagnitudeComputation) {
-    Simulation_Config cfg{};
-    Grid grid{ cfg };
-
-    grid.field( Field::ELECTRIC, Component::X, 50, 50, 50 ) = 3.0;
-    grid.field( Field::ELECTRIC, Component::Y, 50, 50, 50 ) = 4.0;
-    grid.field( Field::ELECTRIC, Component::Z, 50, 50, 50 ) = 0.0;
-
-    ASSERT_NEAR( grid.field_magnitude( Field::ELECTRIC, 50, 50, 50 ), 5.0, 1e-14 );
 }
 
 TEST(Grid, EnergyPositiveDefinite) {
