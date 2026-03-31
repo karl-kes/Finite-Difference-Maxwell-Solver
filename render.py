@@ -41,17 +41,17 @@ e_arrow_thresh = 0.225
 e_radius_min   = 0.10
 e_radius_max   = 0.35
 
-b_mag_thresh   = 0.10
-b_arrow_thresh = 0.20
-b_radius_min   = 0.10
-b_radius_max   = 0.25
+h_mag_thresh   = 0.10
+h_arrow_thresh = 0.20
+h_radius_min   = 0.10
+h_radius_max   = 0.25
 
 # File paths:
 e_path = "output/E.bin"
-b_path = "output/B.bin"
+h_path = "output/H.bin"
 
 assert os.path.exists(e_path), "E.bin not found in output/"
-assert os.path.exists(b_path), "B.bin not found in output/"
+assert os.path.exists(h_path), "H.bin not found in output/"
 
 # Read header:
 with open(e_path, 'rb') as f:
@@ -85,29 +85,29 @@ arrow_origins_full = np.column_stack([
 # Global Extrema:
 print("Scanning for global max values...")
 e_mag_max = 0.0
-b_mag_max = 0.0
+h_mag_max = 0.0
 e_vec_max = 0.0
-b_vec_max = 0.0
+h_vec_max = 0.0
 
-with open(e_path, 'rb') as fe, open(b_path, 'rb') as fb:
+with open(e_path, 'rb') as fe, open(h_path, 'rb') as fb:
     fe.seek(header_bytes)
     fb.seek(header_bytes)
     for i in range(num_frames):
         e_mag, e_vec = load_binary_volume(fe, nx, ny, nz)
-        b_mag, b_vec = load_binary_volume(fb, nx, ny, nz)
+        h_mag, h_vec = load_binary_volume(fb, nx, ny, nz)
 
         e_mag_max = max(e_mag_max, e_mag.max())
-        b_mag_max = max(b_mag_max, b_mag.max())
+        h_mag_max = max(h_mag_max, h_mag.max())
         e_vec_max = max(e_vec_max, np.linalg.norm(e_vec, axis=-1).max())
-        b_vec_max = max(b_vec_max, np.linalg.norm(b_vec, axis=-1).max())
+        h_vec_max = max(h_vec_max, np.linalg.norm(h_vec, axis=-1).max())
 
 if e_mag_max < 1e-10: e_mag_max = 1.0
-if b_mag_max < 1e-10: b_mag_max = 1.0
+if h_mag_max < 1e-10: h_mag_max = 1.0
 if e_vec_max < 1e-10: e_vec_max = 1.0
-if b_vec_max < 1e-10: b_vec_max = 1.0
+if h_vec_max < 1e-10: h_vec_max = 1.0
 
-print(f"E mag max: {e_mag_max:.4f}, B mag max: {b_mag_max:.4f}")
-print(f"E vec max: {e_vec_max:.4f}, B vec max: {b_vec_max:.4f}")
+print(f"E mag max: {e_mag_max:.4f}, H mag max: {h_mag_max:.4f}")
+print(f"E vec max: {e_vec_max:.4f}, H vec max: {h_vec_max:.4f}")
 
 # Initialize:
 rr.init("FDTD_EM_Solver", spawn=True)
@@ -121,12 +121,12 @@ rr.log("world/bounds", rr.Boxes3D(
 ), static=True)
 
 # Initialize caching variable for time-synchronization
-prev_b_total = None
+prev_h_total = None
 
 # Log Frames:
 print("Logging frames to Rerun...")
 
-with open(e_path, 'rb') as fe, open(b_path, 'rb') as fb:
+with open(e_path, 'rb') as fe, open(h_path, 'rb') as fb:
     fe.seek(header_bytes)
     fb.seek(header_bytes)
 
@@ -134,7 +134,7 @@ with open(e_path, 'rb') as fe, open(b_path, 'rb') as fb:
         rr.set_time("timestep", sequence=frame_idx)
 
         e_mag, e_vec = load_binary_volume(fe, nx, ny, nz)
-        b_mag, b_vec = load_binary_volume(fb, nx, ny, nz)
+        h_mag, h_vec = load_binary_volume(fb, nx, ny, nz)
 
         # E-Field Volume:
         e_mag_sub = e_mag[::vol_step, ::vol_step, ::vol_step].ravel()
@@ -179,64 +179,64 @@ with open(e_path, 'rb') as fe, open(b_path, 'rb') as fb:
         else:
             rr.log("world/E_field/vectors", rr.Clear(recursive=False))
 
-        # B-Field Volume:
-        b_mag_sub = b_mag[::vol_step, ::vol_step, ::vol_step].ravel()
-        b_norm = b_mag_sub / b_mag_max
-        b_mask = b_norm > b_mag_thresh
+        # H-Field Volume:
+        h_mag_sub = h_mag[::vol_step, ::vol_step, ::vol_step].ravel()
+        h_norm = h_mag_sub / h_mag_max
+        h_mask = h_norm > h_mag_thresh
 
-        if b_mask.any():
-            b_colors = inferno(b_norm[b_mask])
-            b_radii = (b_radius_min + (b_radius_max - b_radius_min) * b_norm[b_mask]).astype(np.float32)
+        if h_mask.any():
+            h_colors = inferno(h_norm[h_mask])
+            h_radii = (h_radius_min + (h_radius_max - h_radius_min) * h_norm[h_mask]).astype(np.float32)
 
-            rr.log("world/B_field/volume", rr.Points3D(
-                positions=vol_positions[b_mask],
-                colors=b_colors,
-                radii=b_radii,
+            rr.log("world/H_field/volume", rr.Points3D(
+                positions=vol_positions[h_mask],
+                colors=h_colors,
+                radii=h_radii,
             ))
         else:
-            rr.log("world/B_field/volume", rr.Clear(recursive=False))
+            rr.log("world/H_field/volume", rr.Clear(recursive=False))
 
-        # B-Field Vectors:
-        b_vx = b_vec[::arrow_step, ::arrow_step, ::arrow_step, 0].ravel()
-        b_vy = b_vec[::arrow_step, ::arrow_step, ::arrow_step, 1].ravel()
-        b_vz = b_vec[::arrow_step, ::arrow_step, ::arrow_step, 2].ravel()
-        b_vmag = np.sqrt(b_vx**2 + b_vy**2 + b_vz**2)
-        b_amask = b_vmag > b_vec_max * b_arrow_thresh
+        # H-field Vectors:
+        h_vx = h_vec[::arrow_step, ::arrow_step, ::arrow_step, 0].ravel()
+        h_vy = h_vec[::arrow_step, ::arrow_step, ::arrow_step, 1].ravel()
+        h_vz = h_vec[::arrow_step, ::arrow_step, ::arrow_step, 2].ravel()
+        h_vmag = np.sqrt(h_vx**2 + h_vy**2 + h_vz**2)
+        h_amask = h_vmag > h_vec_max * h_arrow_thresh
 
-        if b_amask.any():
-            scale = arrow_scale / b_vec_max
-            b_vectors = np.column_stack([
-                b_vx[b_amask] * scale,
-                b_vy[b_amask] * scale,
-                b_vz[b_amask] * scale,
+        if h_amask.any():
+            scale = arrow_scale / h_vec_max
+            h_vectors = np.column_stack([
+                h_vx[h_amask] * scale,
+                h_vy[h_amask] * scale,
+                h_vz[h_amask] * scale,
             ]).astype(np.float32)
 
-            b_anorm = b_vmag[b_amask] / b_vec_max
-            b_acolors = inferno(b_anorm)
+            h_anorm = h_vmag[h_amask] / h_vec_max
+            h_acolors = inferno(h_anorm)
 
-            rr.log("world/B_field/vectors", rr.Arrows3D(
-                origins=arrow_origins_full[b_amask],
-                vectors=b_vectors,
-                colors=b_acolors,
+            rr.log("world/H_field/vectors", rr.Arrows3D(
+                origins=arrow_origins_full[h_amask],
+                vectors=h_vectors,
+                colors=h_acolors,
             ))
         else:
-            rr.log("world/B_field/vectors", rr.Clear(recursive=False))
+            rr.log("world/H_field/vectors", rr.Clear(recursive=False))
 
         # Energy Scalars:
         e_total = float(np.sum(e_mag**2))
-        b_total = float(np.sum(b_mag**2))
+        h_total = float(np.sum(h_mag**2))
 
         rr.log("plots/E_energy", rr.Scalars(e_total))
-        rr.log("plots/B_energy", rr.Scalars(b_total))
+        rr.log("plots/H_energy", rr.Scalars(h_total))
 
-        # Time-synchronized Total Energy (Interpolating B-field to match E-field time t)
-        if prev_b_total is not None:
-            sync_b_total = (prev_b_total + b_total) / 2.0
-            rr.log("plots/total_energy", rr.Scalars(e_total + sync_b_total))
+        # Time-synchronized Total Energy (Interpolating H-field to match E-field time t)
+        if prev_h_total is not None:
+            sync_h_total = (prev_h_total + h_total) / 2.0
+            rr.log("plots/total_energy", rr.Scalars(e_total + sync_h_total))
         else:
-            rr.log("plots/total_energy", rr.Scalars(e_total + b_total))
+            rr.log("plots/total_energy", rr.Scalars(e_total + h_total))
 
-        prev_b_total = b_total
+        prev_h_total = h_total
 
         if (frame_idx + 1) % 10 == 0 or frame_idx == 0:
             print(f"  Frame {frame_idx + 1}/{num_frames}")

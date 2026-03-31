@@ -23,13 +23,25 @@ void Simulation::initialize() {
     output_.initialize( grid_ );
 
     double const c{ 1.0 / std::sqrt( config_.eps * config_.mu ) };
-    double const freq{ c / ( grid_.Nx()/2 * grid_.dx() ) };
+    double const freq{ c / ( grid_.Nx()/2 * std::sqrt( grid_.dx() )) };
     std::size_t const z{ grid_.Nz()/2 };
+
+    // AC current wire loop:
     grid_.add_source( std::make_unique<AC_Current_Loop>(
         1.0,                     // amplitude
         freq,                    // frequency
         z                        // z-plane level
     ) );
+
+    // AC current straight wire:
+//     grid_.add_source( std::make_unique<Straight_Wire_X>(
+//         1.0,
+//         freq,
+//         grid_.Ny()/2,
+//         grid_.Nz()/2,
+//         0,
+//         grid_.Nx()
+//     ) );
 }
 
 void Simulation::run() {

@@ -35,10 +35,10 @@ void Output::initialize( Grid const &grid ) {
     }
     file_E_.write( reinterpret_cast<char const*>( dimensions_ ), sizeof( dimensions_ ) );
 
-    std::string path_B{ base_path_ + "/H.bin" };
-    file_H_.open( path_B, std::ios::binary | std::ios::out );
+    std::string path_H{ base_path_ + "/H.bin" };
+    file_H_.open( path_H, std::ios::binary | std::ios::out );
     if ( !file_H_.is_open() ) {
-        throw std::runtime_error{ "Failed to open file: " + path_B };
+        throw std::runtime_error{ "Failed to open file: " + path_H };
     }
     file_H_.write( reinterpret_cast<char const*>( dimensions_ ), sizeof( dimensions_ ) );
 
@@ -126,10 +126,10 @@ void Output::write_field( Grid const &grid ) {
     cv_ready_.notify_one();
 }
 
-void Output::flush_buffer( double const* e_data, double const* b_data, std::size_t size ) {
+void Output::flush_buffer( double const* e_data, double const* h_data, std::size_t size ) {
     auto const bytes{ static_cast<std::streamsize>( size * sizeof( double ) ) };
     file_E_.write( reinterpret_cast<char const*>( e_data ), bytes );
-    file_H_.write( reinterpret_cast<char const*>( b_data ), bytes );
+    file_H_.write( reinterpret_cast<char const*>( h_data ), bytes );
 }
 
 void Output::finalize() {

@@ -29,11 +29,11 @@ PML::PML( Simulation_Config const &config )
     double const d{ static_cast<double>( thickness_ ) };
 
     double* RESTRICT b_Ex{ b_Ex_ptr() }; double* RESTRICT c_Ex{ c_Ex_ptr() }; double* RESTRICT kappa_Ex{ kappa_Ex_ptr() };
-    double* RESTRICT b_Hx{ b_Bx_ptr() }; double* RESTRICT c_Hx{ c_Bx_ptr() }; double* RESTRICT kappa_Hx{ kappa_Bx_ptr() };
+    double* RESTRICT b_Hx{ b_Hx_ptr() }; double* RESTRICT c_Hx{ c_Hx_ptr() }; double* RESTRICT kappa_Hx{ kappa_Hx_ptr() };
     double* RESTRICT b_Ey{ b_Ey_ptr() }; double* RESTRICT c_Ey{ c_Ey_ptr() }; double* RESTRICT kappa_Ey{ kappa_Ey_ptr() };
-    double* RESTRICT b_Hy{ b_By_ptr() }; double* RESTRICT c_Hy{ c_By_ptr() }; double* RESTRICT kappa_Hy{ kappa_By_ptr() };
+    double* RESTRICT b_Hy{ b_Hy_ptr() }; double* RESTRICT c_Hy{ c_Hy_ptr() }; double* RESTRICT kappa_Hy{ kappa_Hy_ptr() };
     double* RESTRICT b_Ez{ b_Ez_ptr() }; double* RESTRICT c_Ez{ c_Ez_ptr() }; double* RESTRICT kappa_Ez{ kappa_Ez_ptr() };
-    double* RESTRICT b_Hz{ b_Bz_ptr() }; double* RESTRICT c_Hz{ c_Bz_ptr() }; double* RESTRICT kappa_Hz{ kappa_Bz_ptr() };
+    double* RESTRICT b_Hz{ b_Hz_ptr() }; double* RESTRICT c_Hz{ c_Hz_ptr() }; double* RESTRICT kappa_Hz{ kappa_Hz_ptr() };
 
     for ( std::size_t i{ 0 }; i < thickness_; ++i ) {
         double const depth_E{ ( d - static_cast<double>( i ) ) / d };
@@ -83,19 +83,19 @@ void PML::update_H_psi(
     double const inv_dy{ 1.0 / dy };
     double const inv_dz{ 1.0 / dz };
 
-    double const* RESTRICT bHx{ b_Bx_ptr() };
-    double const* RESTRICT cHx{ c_Bx_ptr() };
-    double const* RESTRICT bHy{ b_By_ptr() };
-    double const* RESTRICT cHy{ c_By_ptr() };
-    double const* RESTRICT bHz{ b_Bz_ptr() };
-    double const* RESTRICT cHz{ c_Bz_ptr() };
+    double const* RESTRICT bHx{ b_Hx_ptr() };
+    double const* RESTRICT cHx{ c_Hx_ptr() };
+    double const* RESTRICT bHy{ b_Hy_ptr() };
+    double const* RESTRICT cHy{ c_Hy_ptr() };
+    double const* RESTRICT bHz{ b_Hz_ptr() };
+    double const* RESTRICT cHz{ c_Hz_ptr() };
 
-    double* RESTRICT pHyx{ psi_Byx_ptr() };
-    double* RESTRICT pHzx{ psi_Bzx_ptr() };
-    double* RESTRICT pHxy{ psi_Bxy_ptr() };
-    double* RESTRICT pHzy{ psi_Bzy_ptr() };
-    double* RESTRICT pHxz{ psi_Bxz_ptr() };
-    double* RESTRICT pHyz{ psi_Byz_ptr() };
+    double* RESTRICT pHyx{ psi_Hyx_ptr() };
+    double* RESTRICT pHzx{ psi_Hzx_ptr() };
+    double* RESTRICT pHxy{ psi_Hxy_ptr() };
+    double* RESTRICT pHzy{ psi_Hzy_ptr() };
+    double* RESTRICT pHxz{ psi_Hxz_ptr() };
+    double* RESTRICT pHyz{ psi_Hyz_ptr() };
 
     ASSUME_ALIGNED(bHx, SIMD_BYTES);
     ASSUME_ALIGNED(cHx, SIMD_BYTES);

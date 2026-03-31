@@ -136,21 +136,21 @@ TEST(Source, StraightWireSinusoidal) {
 
     // At time_step=0, sin(0)=0, so Jx should be 0:
     grid.apply_sources( 0 );
-    for ( std::size_t x = xs; x <= xe; ++x ) {
+    for ( std::size_t x = xs; x < xe; ++x ) {
         ASSERT_NEAR( grid.Jx_ptr()[ grid.idx(x, y, z) ], 0.0, 1e-14 );
     }
 
     // At a later step, should be nonzero along the wire:
     grid.apply_sources( 100 );
     double sum{0};
-    for ( std::size_t x = xs; x <= xe; ++x ) {
+    for ( std::size_t x = xs; x < xe; ++x ) {
         sum += std::abs( grid.Jx_ptr()[ grid.idx(x, y, z) ] );
     }
     ASSERT_GT( sum, 0.0 );
 
     // All wire points should have the same current value:
     double first_val = grid.Jx_ptr()[ grid.idx(xs, y, z) ];
-    for ( std::size_t x = xs + 1; x <= xe; ++x ) {
+    for ( std::size_t x = xs + 1; x < xe; ++x ) {
         ASSERT_NEAR( grid.Jx_ptr()[ grid.idx(x, y, z) ], first_val, 1e-15 );
     }
 }

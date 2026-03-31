@@ -306,15 +306,20 @@ double Grid::e_energy() const {
     std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
 
     #pragma omp parallel for collapse( 2 ) reduction( +:energy )
-    for ( std::size_t z = 0; z < Nz_; ++z ) {
-        for ( std::size_t y = 0; y < Ny_; ++y ) {
-            
+    for ( std::size_t z = 1; z < Nz_ - 1; ++z ) {
+        for ( std::size_t y = 1; y < Ny_ - 1; ++y ) {
             std::size_t const base{ y * Sy + z * Sz };
-            for ( std::size_t x = 0; x < Nx_; ++x ) {
+
+            for ( std::size_t x = 1; x < Nx_ - 1; ++x ) {
                 std::size_t const i{ base + x };
-                energy += eps_x[i] * Ex[i]*Ex[i]
-                        + eps_y[i] * Ey[i]*Ey[i]
-                        + eps_z[i] * Ez[i]*Ez[i];
+
+                double const Ex_avg{ ( Ex[i] + Ex[i+1] ) * 0.5 };
+                double const Ey_avg{ ( Ey[i] + Ey[i+Sy] ) * 0.5 };
+                double const Ez_avg{ ( Ez[i] + Ez[i+Sz] ) * 0.5 };
+
+                energy += eps_x[i] * Ex_avg * Ex_avg
+                        + eps_y[i] * Ey_avg * Ey_avg
+                        + eps_z[i] * Ez_avg * Ez_avg;
             }
         }
     }
@@ -337,15 +342,20 @@ double Grid::h_energy() const {
     std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
 
     #pragma omp parallel for collapse( 2 ) reduction( +:energy )
-    for ( std::size_t z = 0; z < Nz_; ++z ) {
-        for ( std::size_t y = 0; y < Ny_; ++y ) {
-
+    for ( std::size_t z = 1; z < Nz_ - 1; ++z ) {
+        for ( std::size_t y = 1; y < Ny_ - 1; ++y ) {
             std::size_t const base{ y * Sy + z * Sz };
-            for ( std::size_t x = 0; x < Nx_; ++x ) {
+
+            for ( std::size_t x = 1; x < Nx_ - 1; ++x ) {
                 std::size_t const i{ base + x };
-                energy += mu_x[i] * Hx[i]*Hx[i]
-                        + mu_y[i] * Hy[i]*Hy[i]
-                        + mu_z[i] * Hz[i]*Hz[i];
+
+                double const Hx_avg{ ( Hx[i] + Hx[i+Sy] + Hx[i+Sz] + Hx[i+Sy+Sz] ) * 0.25 };
+                double const Hy_avg{ ( Hy[i] + Hy[i+1]  + Hy[i+Sz] + Hy[i+1+Sz]  ) * 0.25 };
+                double const Hz_avg{ ( Hz[i] + Hz[i+1]  + Hz[i+Sy] + Hz[i+1+Sy]  ) * 0.25 };
+
+                energy += mu_x[i] * Hx_avg * Hx_avg
+                        + mu_y[i] * Hy_avg * Hy_avg
+                        + mu_z[i] * Hz_avg * Hz_avg;
             }
         }
     }

@@ -9,11 +9,11 @@
 
 enum CoeffArray : std::size_t {
     B_EX_,  C_EX_,  KAPPA_EX_,
-    B_BX_,  C_BX_,  KAPPA_BX_,
+    B_HX_,  C_HX_,  KAPPA_HX_,
     B_EY_,  C_EY_,  KAPPA_EY_,
-    B_BY_,  C_BY_,  KAPPA_BY_,
+    B_HY_,  C_HY_,  KAPPA_HY_,
     B_EZ_,  C_EZ_,  KAPPA_EZ_,
-    B_BZ_,  C_BZ_,  KAPPA_BZ_,
+    B_HZ_,  C_HZ_,  KAPPA_HZ_,
     NUM_COEFF_ARRAYS_
 };
 
@@ -21,9 +21,9 @@ enum PsiArray : std::size_t {
     PSI_EYX_,  PSI_EZX_,
     PSI_EXY_,  PSI_EZY_,
     PSI_EXZ_,  PSI_EYZ_,
-    PSI_BYX_,  PSI_BZX_,
-    PSI_BXY_,  PSI_BZY_,
-    PSI_BXZ_,  PSI_BYZ_,
+    PSI_HYX_,  PSI_HZX_,
+    PSI_HXY_,  PSI_HZY_,
+    PSI_HXZ_,  PSI_HYZ_,
     NUM_PSI_ARRAYS_
 };
 
@@ -32,6 +32,7 @@ private:
     std::size_t thickness_;
     std::size_t Nx_, Ny_, Nz_;
     std::size_t Nx_padded_, Ny_padded_;
+    
     int order_;
     double sigma_max_;
     double kappa_max_;
@@ -86,49 +87,49 @@ public:
     [[nodiscard]] double* c_Ex_ptr() { return coeffs_[C_EX_]; }
     [[nodiscard]] double* kappa_Ex_ptr() { return coeffs_[KAPPA_EX_]; }
 
-    [[nodiscard]] double* b_Bx_ptr() { return coeffs_[B_BX_]; }
-    [[nodiscard]] double* c_Bx_ptr() { return coeffs_[C_BX_]; }
-    [[nodiscard]] double* kappa_Bx_ptr() { return coeffs_[KAPPA_BX_]; }
+    [[nodiscard]] double* b_Hx_ptr() { return coeffs_[B_HX_]; }
+    [[nodiscard]] double* c_Hx_ptr() { return coeffs_[C_HX_]; }
+    [[nodiscard]] double* kappa_Hx_ptr() { return coeffs_[KAPPA_HX_]; }
 
     [[nodiscard]] double* b_Ey_ptr() { return coeffs_[B_EY_]; }
     [[nodiscard]] double* c_Ey_ptr() { return coeffs_[C_EY_]; }
     [[nodiscard]] double* kappa_Ey_ptr() { return coeffs_[KAPPA_EY_]; }
 
-    [[nodiscard]] double* b_By_ptr() { return coeffs_[B_BY_]; }
-    [[nodiscard]] double* c_By_ptr() { return coeffs_[C_BY_]; }
-    [[nodiscard]] double* kappa_By_ptr() { return coeffs_[KAPPA_BY_]; }
+    [[nodiscard]] double* b_Hy_ptr() { return coeffs_[B_HY_]; }
+    [[nodiscard]] double* c_Hy_ptr() { return coeffs_[C_HY_]; }
+    [[nodiscard]] double* kappa_Hy_ptr() { return coeffs_[KAPPA_HY_]; }
 
     [[nodiscard]] double* b_Ez_ptr() { return coeffs_[B_EZ_]; }
     [[nodiscard]] double* c_Ez_ptr() { return coeffs_[C_EZ_]; }
     [[nodiscard]] double* kappa_Ez_ptr() { return coeffs_[KAPPA_EZ_]; }
 
-    [[nodiscard]] double* b_Bz_ptr() { return coeffs_[B_BZ_]; }
-    [[nodiscard]] double* c_Bz_ptr() { return coeffs_[C_BZ_]; }
-    [[nodiscard]] double* kappa_Bz_ptr() { return coeffs_[KAPPA_BZ_]; }
+    [[nodiscard]] double* b_Hz_ptr() { return coeffs_[B_HZ_]; }
+    [[nodiscard]] double* c_Hz_ptr() { return coeffs_[C_HZ_]; }
+    [[nodiscard]] double* kappa_Hz_ptr() { return coeffs_[KAPPA_HZ_]; }
 
     [[nodiscard]] double const* b_Ex_ptr() const { return coeffs_[B_EX_]; }
     [[nodiscard]] double const* c_Ex_ptr() const { return coeffs_[C_EX_]; }
     [[nodiscard]] double const* kappa_Ex_ptr() const { return coeffs_[KAPPA_EX_]; }
 
-    [[nodiscard]] double const* b_Bx_ptr() const { return coeffs_[B_BX_]; }
-    [[nodiscard]] double const* c_Bx_ptr() const { return coeffs_[C_BX_]; }
-    [[nodiscard]] double const* kappa_Bx_ptr() const { return coeffs_[KAPPA_BX_]; }
+    [[nodiscard]] double const* b_Hx_ptr() const { return coeffs_[B_HX_]; }
+    [[nodiscard]] double const* c_Hx_ptr() const { return coeffs_[C_HX_]; }
+    [[nodiscard]] double const* kappa_Hx_ptr() const { return coeffs_[KAPPA_HX_]; }
 
     [[nodiscard]] double const* b_Ey_ptr() const { return coeffs_[B_EY_]; }
     [[nodiscard]] double const* c_Ey_ptr() const { return coeffs_[C_EY_]; }
     [[nodiscard]] double const* kappa_Ey_ptr() const { return coeffs_[KAPPA_EY_]; }
 
-    [[nodiscard]] double const* b_By_ptr() const { return coeffs_[B_BY_]; }
-    [[nodiscard]] double const* c_By_ptr() const { return coeffs_[C_BY_]; }
-    [[nodiscard]] double const* kappa_By_ptr() const { return coeffs_[KAPPA_BY_]; }
+    [[nodiscard]] double const* b_Hy_ptr() const { return coeffs_[B_HY_]; }
+    [[nodiscard]] double const* c_Hy_ptr() const { return coeffs_[C_HY_]; }
+    [[nodiscard]] double const* kappa_Hy_ptr() const { return coeffs_[KAPPA_HY_]; }
 
     [[nodiscard]] double const* b_Ez_ptr() const { return coeffs_[B_EZ_]; }
     [[nodiscard]] double const* c_Ez_ptr() const { return coeffs_[C_EZ_]; }
     [[nodiscard]] double const* kappa_Ez_ptr() const { return coeffs_[KAPPA_EZ_]; }
 
-    [[nodiscard]] double const* b_Bz_ptr() const { return coeffs_[B_BZ_]; }
-    [[nodiscard]] double const* c_Bz_ptr() const { return coeffs_[C_BZ_]; }
-    [[nodiscard]] double const* kappa_Bz_ptr() const { return coeffs_[KAPPA_BZ_]; }
+    [[nodiscard]] double const* b_Hz_ptr() const { return coeffs_[B_HZ_]; }
+    [[nodiscard]] double const* c_Hz_ptr() const { return coeffs_[C_HZ_]; }
+    [[nodiscard]] double const* kappa_Hz_ptr() const { return coeffs_[KAPPA_HZ_]; }
 
     [[nodiscard]] double* psi_Eyx_ptr() { return psi_[PSI_EYX_]; }
     [[nodiscard]] double* psi_Ezx_ptr() { return psi_[PSI_EZX_]; }
@@ -137,12 +138,12 @@ public:
     [[nodiscard]] double* psi_Exz_ptr() { return psi_[PSI_EXZ_]; }
     [[nodiscard]] double* psi_Eyz_ptr() { return psi_[PSI_EYZ_]; }
     
-    [[nodiscard]] double* psi_Byx_ptr() { return psi_[PSI_BYX_]; }
-    [[nodiscard]] double* psi_Bzx_ptr() { return psi_[PSI_BZX_]; }
-    [[nodiscard]] double* psi_Bxy_ptr() { return psi_[PSI_BXY_]; }
-    [[nodiscard]] double* psi_Bzy_ptr() { return psi_[PSI_BZY_]; }
-    [[nodiscard]] double* psi_Bxz_ptr() { return psi_[PSI_BXZ_]; }
-    [[nodiscard]] double* psi_Byz_ptr() { return psi_[PSI_BYZ_]; }
+    [[nodiscard]] double* psi_Hyx_ptr() { return psi_[PSI_HYX_]; }
+    [[nodiscard]] double* psi_Hzx_ptr() { return psi_[PSI_HZX_]; }
+    [[nodiscard]] double* psi_Hxy_ptr() { return psi_[PSI_HXY_]; }
+    [[nodiscard]] double* psi_Hzy_ptr() { return psi_[PSI_HZY_]; }
+    [[nodiscard]] double* psi_Hxz_ptr() { return psi_[PSI_HXZ_]; }
+    [[nodiscard]] double* psi_Hyz_ptr() { return psi_[PSI_HYZ_]; }
 
     [[nodiscard]] std::size_t psi_face_x() const { return psi_face_x_; }
     [[nodiscard]] std::size_t psi_face_y() const { return psi_face_y_; }

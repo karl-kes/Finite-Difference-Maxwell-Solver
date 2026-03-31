@@ -25,20 +25,20 @@ TEST(PML, CoefficientsInValidRange) {
         ASSERT_GT( pml.b_Ex_ptr()[i], 0.0 );
         ASSERT_LT( pml.b_Ex_ptr()[i], 1.0 + 1e-10 );
 
-        ASSERT_GT( pml.b_Bx_ptr()[i], 0.0 );
-        ASSERT_LT( pml.b_Bx_ptr()[i], 1.0 + 1e-10 );
+        ASSERT_GT( pml.b_Hx_ptr()[i], 0.0 );
+        ASSERT_LT( pml.b_Hx_ptr()[i], 1.0 + 1e-10 );
     }
 
     // c coefficients should be non-positive (sigma*(b-1)/denom, where b<1):
     for ( std::size_t i = 0; i < pml.thickness(); ++i ) {
         ASSERT_LT( pml.c_Ex_ptr()[i], 1e-15 );  // <= 0
-        ASSERT_LT( pml.c_Bx_ptr()[i], 1e-15 );
+        ASSERT_LT( pml.c_Hx_ptr()[i], 1e-15 );
     }
 
     // kappa should be >= 1.0:
     for ( std::size_t i = 0; i < pml.thickness(); ++i ) {
         ASSERT_GT( pml.kappa_Ex_ptr()[i], 1.0 - 1e-10 );
-        ASSERT_GT( pml.kappa_Bx_ptr()[i], 1.0 - 1e-10 );
+        ASSERT_GT( pml.kappa_Hx_ptr()[i], 1.0 - 1e-10 );
     }
 }
 
@@ -84,19 +84,19 @@ TEST(PML, SymmetricAcrossDirections) {
     }
 }
 
-TEST(PML, HalfIntegerShiftForBCoeffs) {
+TEST(PML, HalfIntegerShiftForHCoeffs) {
     Simulation_Config cfg{};
     PML pml{ cfg };
 
-    // B-field coefficients use half-integer positions (i+0.5) so they
+    // H-field coefficients use half-integer positions (i+0.5) so they
     // should differ from E-field coefficients (integer positions):
     for ( std::size_t i = 0; i < pml.thickness(); ++i ) {
         // They should NOT be identical (except possibly at edges):
-        // At inner layer (i = thickness-1), depth_B can go negative, so
+        // At inner layer (i = thickness-1), depth_H can go negative, so
         // we only check layers where both depths are positive:
         if ( i < pml.thickness() - 1 ) {
-            double diff_b = std::abs( pml.b_Ex_ptr()[i] - pml.b_Bx_ptr()[i] );
-            double diff_k = std::abs( pml.kappa_Ex_ptr()[i] - pml.kappa_Bx_ptr()[i] );
+            double diff_b = std::abs( pml.b_Ex_ptr()[i] - pml.b_Hx_ptr()[i] );
+            double diff_k = std::abs( pml.kappa_Ex_ptr()[i] - pml.kappa_Hx_ptr()[i] );
             // At least one should differ (staggering effect):
             ASSERT_GT( diff_b + diff_k, 1e-15 );
         }

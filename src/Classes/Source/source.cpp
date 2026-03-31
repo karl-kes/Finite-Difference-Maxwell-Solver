@@ -9,7 +9,7 @@ void Straight_Wire_X::apply( Grid &grid, std::size_t const time_step ) {
 
     double* RESTRICT Jx{ grid.Jx_ptr() };
 
-    for ( std::size_t x{ x_start_ }; x <= x_end_; ++x ) {
+    for ( std::size_t x{ x_start_ }; x < x_end_; ++x ) {
         std::size_t const i{ grid.idx(x,y_,z_) };
         Jx[i] = current;
     }
