@@ -11,12 +11,11 @@ def inferno(t):
     b = np.clip(255 * (2.3137 * t**3 - 4.8890 * t**2 + 2.6561 * t + 0.0892), 0, 255)
     return np.stack([r, g, b], axis=-1).astype(np.uint8)
 
-def cyan(t):
-    # Cyan/teal colormap, t in [0,1] -> (R,G,B) in [0,255].
+def viridis(t):
     t = np.clip(t, 0.0, 1.0)
-    r = np.clip(255 * (0.1 * t), 0, 255)
-    g = np.clip(255 * (0.4 + 0.6 * t), 0, 255)
-    b = np.clip(255 * (0.5 + 0.5 * t), 0, 255)
+    r = np.clip(255 * ( t * t * 1.0 ), 0, 255)
+    g = np.clip(255 * ( 0.15 + t * 0.75 ), 0, 255)
+    b = np.clip(255 * ( 0.55 - t * 0.35 ), 0, 255)
     return np.stack([r, g, b], axis=-1).astype(np.uint8)
 
 # Binary Loader:
@@ -38,7 +37,7 @@ arrow_scale = 1.5    # Arrow length scaling
 
 # Per-field thresholds and radii:
 e_mag_thresh   = 0.15
-e_arrow_thresh = 0.08
+e_arrow_thresh = 0.225
 e_radius_min   = 0.10
 e_radius_max   = 0.35
 
@@ -143,7 +142,7 @@ with open(e_path, 'rb') as fe, open(b_path, 'rb') as fb:
         e_mask = e_norm > e_mag_thresh
 
         if e_mask.any():
-            e_colors = cyan(e_norm[e_mask])
+            e_colors = viridis(e_norm[e_mask])
             e_radii = (e_radius_min + (e_radius_max - e_radius_min) * e_norm[e_mask]).astype(np.float32)
 
             rr.log("world/E_field/volume", rr.Points3D(
@@ -170,7 +169,7 @@ with open(e_path, 'rb') as fe, open(b_path, 'rb') as fb:
             ]).astype(np.float32)
 
             e_anorm = e_vmag[e_amask] / e_vec_max
-            e_acolors = cyan(e_anorm)
+            e_acolors = viridis(e_anorm)
 
             rr.log("world/E_field/vectors", rr.Arrows3D(
                 origins=arrow_origins_full[e_amask],

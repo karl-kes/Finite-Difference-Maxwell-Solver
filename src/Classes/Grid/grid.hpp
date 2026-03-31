@@ -12,16 +12,16 @@ class Source;
 
 // Monolithic field array indices:
 enum GridArray : std::size_t {
-    EX_,
-    EY_,
-    EZ_,
-    BX_,
-    BY_,
-    BZ_,
-    JX_,
-    JY_,
-    JZ_,
-    NUM_GRID_ARRAYS_
+    EX_, EY_, EZ_,
+    HX_, HY_, HZ_,
+    JX_, JY_, JZ_,
+    EPS_X_, EPS_Y_, EPS_Z_,
+    SIG_X_, SIG_Y_, SIG_Z_,
+    MU_X_, MU_Y_,   MU_Z_,
+    CA_X_, CA_Y_, CA_Z_, // E damp coeffs.
+    CB_X_, CB_Y_, CB_Z_, // E curl coeffs.
+    DB_X_, DB_Y_, DB_Z_, // H curl coeffs.
+    NUM_ARRAYS_
 };
 
 class Grid {
@@ -30,20 +30,14 @@ private:
     std::size_t Nx_, Ny_, Nz_;
     std::size_t Nx_padded_, Ny_padded_, Nz_padded_;
     
-    // Total Grid Size:
-    std::size_t N_;
-
     // Spatial Cell Size:
     double dx_, dy_, dz_;
 
-    // Material Properties:
-    double eps_, mu_;
-
     // Derived Constants:
-    double c_, c_sq_, dt_;
+    double dt_;
 
     // Field Components (single monolithic aligned block):
-    AlignedSoA<double> fields_;
+    AlignedSoA<double> data_;
 
     // Sources:
     std::vector<std::unique_ptr<Source>> sources_;
@@ -52,8 +46,10 @@ private:
     PML pml_;
 
     // Private Methods:
-    void update_B();
+    void update_H();
     void update_E();
+    [[nodiscard]] PML const &pml() const { return pml_; }
+
     
 public:
     // Constructor:
@@ -102,42 +98,84 @@ public:
     [[nodiscard]] double dy() const { return dy_; }
     [[nodiscard]] double dz() const { return dz_; }
 
-    [[nodiscard]] double eps() const { return eps_; }
-    [[nodiscard]] double mu() const { return mu_; }
-    [[nodiscard]] double c() const { return c_; }
-    [[nodiscard]] double c_sq() const { return c_sq_; }
-
     [[nodiscard]] double dt() const { return dt_; }
 
-    // Raw Pointer Field Getters (mutable):
-    [[nodiscard]] double* Ex_ptr() { return fields_[EX_]; }
-    [[nodiscard]] double* Ey_ptr() { return fields_[EY_]; }
-    [[nodiscard]] double* Ez_ptr() { return fields_[EZ_]; }
+    // Raw Pointer Getters (mutable):
+    [[nodiscard]] double* Ex_ptr() { return data_[EX_]; }
+    [[nodiscard]] double* Ey_ptr() { return data_[EY_]; }
+    [[nodiscard]] double* Ez_ptr() { return data_[EZ_]; }
 
-    [[nodiscard]] double* Bx_ptr() { return fields_[BX_]; }
-    [[nodiscard]] double* By_ptr() { return fields_[BY_]; }
-    [[nodiscard]] double* Bz_ptr() { return fields_[BZ_]; }
+    [[nodiscard]] double* Hx_ptr() { return data_[HX_]; }
+    [[nodiscard]] double* Hy_ptr() { return data_[HY_]; }
+    [[nodiscard]] double* Hz_ptr() { return data_[HZ_]; }
 
-    [[nodiscard]] double* Jx_ptr() { return fields_[JX_]; }
-    [[nodiscard]] double* Jy_ptr() { return fields_[JY_]; }
-    [[nodiscard]] double* Jz_ptr() { return fields_[JZ_]; }
+    [[nodiscard]] double* Jx_ptr() { return data_[JX_]; }
+    [[nodiscard]] double* Jy_ptr() { return data_[JY_]; }
+    [[nodiscard]] double* Jz_ptr() { return data_[JZ_]; }
 
-    // Raw Pointer Field Getters (immutable):
-    [[nodiscard]] double const* Ex_ptr() const { return fields_[EX_]; }
-    [[nodiscard]] double const* Ey_ptr() const { return fields_[EY_]; }
-    [[nodiscard]] double const* Ez_ptr() const { return fields_[EZ_]; }
+    [[nodiscard]] double* eps_x_ptr() { return data_[EPS_X_]; }
+    [[nodiscard]] double* eps_y_ptr() { return data_[EPS_Y_]; }
+    [[nodiscard]] double* eps_z_ptr() { return data_[EPS_Z_]; }
 
-    [[nodiscard]] double const* Bx_ptr() const { return fields_[BX_]; }
-    [[nodiscard]] double const* By_ptr() const { return fields_[BY_]; }
-    [[nodiscard]] double const* Bz_ptr() const { return fields_[BZ_]; }
+    [[nodiscard]] double* sig_x_ptr() { return data_[SIG_X_]; }
+    [[nodiscard]] double* sig_y_ptr() { return data_[SIG_Y_]; }
+    [[nodiscard]] double* sig_z_ptr() { return data_[SIG_Z_]; }
 
-    [[nodiscard]] double const* Jx_ptr() const { return fields_[JX_]; }
-    [[nodiscard]] double const* Jy_ptr() const { return fields_[JY_]; }
-    [[nodiscard]] double const* Jz_ptr() const { return fields_[JZ_]; }
+    [[nodiscard]] double* mu_x_ptr() { return data_[MU_X_]; }
+    [[nodiscard]] double* mu_y_ptr() { return data_[MU_Y_]; }
+    [[nodiscard]] double* mu_z_ptr() { return data_[MU_Z_]; }
+
+    [[nodiscard]] double* Ca_x_ptr() { return data_[CA_X_]; }
+    [[nodiscard]] double* Ca_y_ptr() { return data_[CA_Y_]; }
+    [[nodiscard]] double* Ca_z_ptr() { return data_[CA_Z_]; }
+
+    [[nodiscard]] double* Cb_x_ptr() { return data_[CB_X_]; }
+    [[nodiscard]] double* Cb_y_ptr() { return data_[CB_Y_]; }
+    [[nodiscard]] double* Cb_z_ptr() { return data_[CB_Z_]; }
+
+    [[nodiscard]] double* Db_x_ptr() { return data_[DB_X_]; }
+    [[nodiscard]] double* Db_y_ptr() { return data_[DB_Y_]; }
+    [[nodiscard]] double* Db_z_ptr() { return data_[DB_Z_]; }
+
+    // Raw Pointer Getters (immutable):
+    [[nodiscard]] double const* Ex_ptr() const { return data_[EX_]; }
+    [[nodiscard]] double const* Ey_ptr() const { return data_[EY_]; }
+    [[nodiscard]] double const* Ez_ptr() const { return data_[EZ_]; }
+
+    [[nodiscard]] double const* Hx_ptr() const { return data_[HX_]; }
+    [[nodiscard]] double const* Hy_ptr() const { return data_[HY_]; }
+    [[nodiscard]] double const* Hz_ptr() const { return data_[HZ_]; }
+
+    [[nodiscard]] double const* Jx_ptr() const { return data_[JX_]; }
+    [[nodiscard]] double const* Jy_ptr() const { return data_[JY_]; }
+    [[nodiscard]] double const* Jz_ptr() const { return data_[JZ_]; }
+    
+    [[nodiscard]] double const* eps_x_ptr() const { return data_[EPS_X_]; }
+    [[nodiscard]] double const* eps_y_ptr() const { return data_[EPS_Y_]; }
+    [[nodiscard]] double const* eps_z_ptr() const { return data_[EPS_Z_]; }
+
+    [[nodiscard]] double const* sig_x_ptr() const { return data_[SIG_X_]; }
+    [[nodiscard]] double const* sig_y_ptr() const { return data_[SIG_Y_]; }
+    [[nodiscard]] double const* sig_z_ptr() const { return data_[SIG_Z_]; }
+
+    [[nodiscard]] double const* mu_x_ptr() const { return data_[MU_X_]; }
+    [[nodiscard]] double const* mu_y_ptr() const { return data_[MU_Y_]; }
+    [[nodiscard]] double const* mu_z_ptr() const { return data_[MU_Z_]; }
+
+    [[nodiscard]] double const* Ca_x_ptr() const { return data_[CA_X_]; }
+    [[nodiscard]] double const* Ca_y_ptr() const { return data_[CA_Y_]; }
+    [[nodiscard]] double const* Ca_z_ptr() const { return data_[CA_Z_]; }
+
+    [[nodiscard]] double const* Cb_x_ptr() const { return data_[CB_X_]; }
+    [[nodiscard]] double const* Cb_y_ptr() const { return data_[CB_Y_]; }
+    [[nodiscard]] double const* Cb_z_ptr() const { return data_[CB_Z_]; }
+
+    [[nodiscard]] double const* Db_x_ptr() const { return data_[DB_X_]; }
+    [[nodiscard]] double const* Db_y_ptr() const { return data_[DB_Y_]; }
+    [[nodiscard]] double const* Db_z_ptr() const { return data_[DB_Z_]; }
 
     // Diagnostics:
+    [[nodiscard]] double h_energy() const;
+    [[nodiscard]] double e_energy() const;
     [[nodiscard]] double total_energy() const;
-    [[nodiscard]] double source_power() const;
-
-    [[nodiscard]] PML const &pml() const { return pml_; }
 };

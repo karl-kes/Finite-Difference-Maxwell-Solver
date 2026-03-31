@@ -14,18 +14,54 @@ Grid::Grid( Simulation_Config const &config )
 , Nx_padded_{ AlignedSoA<double>::round_up( Nx_ ) }
 , Ny_padded_{ AlignedSoA<double>::round_up( Ny_ ) }
 , Nz_padded_{ AlignedSoA<double>::round_up( Nz_ ) }
-, N_{ Nx_*Ny_*Nz_ }
 , dx_{ config.dx }
 , dy_{ config.dy }
 , dz_{ config.dz }
-, eps_{ config.eps }
-, mu_{ config.mu }
-, c_{ config.c }
-, c_sq_{ config.c * config.c }
 , dt_{ config.dt }
-, fields_{ Nx_padded_ * Ny_padded_ * Nz_padded_, NUM_GRID_ARRAYS_ }
-, pml_{ config }
-{ }
+, data_{ Nx_padded_ * Ny_padded_ * Nz_padded_, NUM_ARRAYS_ }
+, pml_{ config } {
+    std::size_t const total{ Nx_padded_ * Ny_padded_ * Nz_padded_ };
+
+    // Default initialize eps:
+    std::fill_n( eps_x_ptr(), total, config.eps );
+    std::fill_n( eps_y_ptr(), total, config.eps );
+    std::fill_n( eps_z_ptr(), total, config.eps );
+
+    // Default initialize mu:
+    std::fill_n( mu_x_ptr(), total, config.mu );
+    std::fill_n( mu_y_ptr(), total, config.mu );
+    std::fill_n( mu_z_ptr(), total, config.mu );
+
+    // sig arrays are already zero from AlignedSoA zero-init.
+
+    // Bake hot-loop coeffs:
+    #pragma omp simd
+    for ( std::size_t i = 0; i < total; ++i ) {
+        // Losses in all components:
+        double const loss_x{ sig_x_ptr()[i] * dt_ / ( 2.0 * eps_x_ptr()[i] ) };
+        double const loss_y{ sig_y_ptr()[i] * dt_ / ( 2.0 * eps_y_ptr()[i] ) };
+        double const loss_z{ sig_z_ptr()[i] * dt_ / ( 2.0 * eps_z_ptr()[i] ) };
+
+        // C_a constant:
+        Ca_x_ptr()[i] = ( 1.0 - loss_x ) / ( 1.0 + loss_x );
+        Ca_y_ptr()[i] = ( 1.0 - loss_y ) / ( 1.0 + loss_y );
+        Ca_z_ptr()[i] = ( 1.0 - loss_z ) / ( 1.0 + loss_z );
+
+        double const denom_x{ eps_x_ptr()[i] / dt_ + sig_x_ptr()[i] / 2.0 };
+        double const denom_y{ eps_y_ptr()[i] / dt_ + sig_y_ptr()[i] / 2.0 };
+        double const denom_z{ eps_z_ptr()[i] / dt_ + sig_z_ptr()[i] / 2.0 };
+        
+        // C_b constant:
+        Cb_x_ptr()[i] = 1.0 / denom_x;
+        Cb_y_ptr()[i] = 1.0 / denom_y;
+        Cb_z_ptr()[i] = 1.0 / denom_z;
+
+        // D_b constant:
+        Db_x_ptr()[i] = dt_ / mu_x_ptr()[i];
+        Db_y_ptr()[i] = dt_ / mu_y_ptr()[i];
+        Db_z_ptr()[i] = dt_ / mu_z_ptr()[i];
+    }
+}
 
 Grid::~Grid() = default;
 
@@ -39,24 +75,31 @@ void Grid::apply_sources( std::size_t const time_step ) {
     }
 }
 
-void Grid::update_B() {
-    double* RESTRICT Bx{ Bx_ptr() };
-    double* RESTRICT By{ By_ptr() };
-    double* RESTRICT Bz{ Bz_ptr() };
+void Grid::update_H() {
+    double* RESTRICT Hx{ Hx_ptr() };
+    double* RESTRICT Hy{ Hy_ptr() };
+    double* RESTRICT Hz{ Hz_ptr() };
 
     double* RESTRICT Ex{ Ex_ptr() };
     double* RESTRICT Ey{ Ey_ptr() };
     double* RESTRICT Ez{ Ez_ptr() };
 
+    double* RESTRICT Db_x{ Db_x_ptr() };
+    double* RESTRICT Db_y{ Db_y_ptr() };
+    double* RESTRICT Db_z{ Db_z_ptr() };
+
     ASSUME_ALIGNED(Ex, SIMD_BYTES);
     ASSUME_ALIGNED(Ey, SIMD_BYTES);
     ASSUME_ALIGNED(Ez, SIMD_BYTES);
 
-    ASSUME_ALIGNED(Bx, SIMD_BYTES);
-    ASSUME_ALIGNED(By, SIMD_BYTES);
-    ASSUME_ALIGNED(Bz, SIMD_BYTES);
+    ASSUME_ALIGNED(Hx, SIMD_BYTES);
+    ASSUME_ALIGNED(Hy, SIMD_BYTES);
+    ASSUME_ALIGNED(Hz, SIMD_BYTES);
 
-    double const dt_local{ dt_ };
+    ASSUME_ALIGNED(Db_x, SIMD_BYTES);
+    ASSUME_ALIGNED(Db_y, SIMD_BYTES);
+    ASSUME_ALIGNED(Db_z, SIMD_BYTES);
+
     double const inv_dx{ 1.0 / dx_ };
     double const inv_dy{ 1.0 / dy_ };
     double const inv_dz{ 1.0 / dz_ };
@@ -64,6 +107,7 @@ void Grid::update_B() {
     std::size_t const nx{ Nx_ };
     std::size_t const ny{ Ny_ };
     std::size_t const nz{ Nz_ };
+
     std::size_t const Sy{ Nx_padded_ };
     std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
 
@@ -89,21 +133,24 @@ void Grid::update_B() {
                   - ( Ex[i + Sy] - Ex[i] ) * inv_dy
                 };
 
-                Bx[i] -= dt_local * curl_x;
-                By[i] -= dt_local * curl_y;
-                Bz[i] -= dt_local * curl_z;
+                Hx[i] -= Db_x[i] * curl_x;
+                Hy[i] -= Db_y[i] * curl_y;
+                Hz[i] -= Db_z[i] * curl_z;
             }
         }
     }
-    pml_.update_B_psi( Ex_ptr(), Ey_ptr(), Ez_ptr(),
-                       Bx_ptr(), By_ptr(), Bz_ptr(),
-                       dt_, dx_, dy_, dz_ );
+
+    pml_.update_H_psi(
+        Ex_ptr(), Ey_ptr(), Ez_ptr(),
+        Hx_ptr(), Hy_ptr(), Hz_ptr(),
+        dt_, dx_, dy_, dz_ 
+    );    
 }
 
 void Grid::update_E() {
-    double* RESTRICT Bx{ Bx_ptr() };
-    double* RESTRICT By{ By_ptr() };
-    double* RESTRICT Bz{ Bz_ptr() };
+    double* RESTRICT Hx{ Hx_ptr() };
+    double* RESTRICT Hy{ Hy_ptr() };
+    double* RESTRICT Hz{ Hz_ptr() };
 
     double* RESTRICT Ex{ Ex_ptr() };
     double* RESTRICT Ey{ Ey_ptr() };
@@ -113,24 +160,33 @@ void Grid::update_E() {
     double* RESTRICT Jy{ Jy_ptr() };
     double* RESTRICT Jz{ Jz_ptr() };
 
+    double* RESTRICT Ca_x{ Ca_x_ptr() };
+    double* RESTRICT Ca_y{ Ca_y_ptr() };
+    double* RESTRICT Ca_z{ Ca_z_ptr() };
+
+    double* RESTRICT Cb_x{ Cb_x_ptr() };
+    double* RESTRICT Cb_y{ Cb_y_ptr() };
+    double* RESTRICT Cb_z{ Cb_z_ptr() };
+
     ASSUME_ALIGNED(Ex, SIMD_BYTES);
     ASSUME_ALIGNED(Ey, SIMD_BYTES);
     ASSUME_ALIGNED(Ez, SIMD_BYTES);
 
-    ASSUME_ALIGNED(Bx, SIMD_BYTES);
-    ASSUME_ALIGNED(By, SIMD_BYTES);
-    ASSUME_ALIGNED(Bz, SIMD_BYTES);
+    ASSUME_ALIGNED(Hx, SIMD_BYTES);
+    ASSUME_ALIGNED(Hy, SIMD_BYTES);
+    ASSUME_ALIGNED(Hz, SIMD_BYTES);
 
     ASSUME_ALIGNED(Jx, SIMD_BYTES);
     ASSUME_ALIGNED(Jy, SIMD_BYTES);
     ASSUME_ALIGNED(Jz, SIMD_BYTES);
 
-    double const dt_local{ dt_ };
-    double const c_sq{ c_sq_ };
-    double const inv_eps{ 1.0 / eps_ };
+    ASSUME_ALIGNED(Ca_x, SIMD_BYTES);
+    ASSUME_ALIGNED(Ca_y, SIMD_BYTES);
+    ASSUME_ALIGNED(Ca_z, SIMD_BYTES);
 
-    double const dt_c_sq{dt_local * c_sq};
-    double const dt_inv_eps{dt_local * inv_eps};
+    ASSUME_ALIGNED(Cb_x, SIMD_BYTES);
+    ASSUME_ALIGNED(Cb_y, SIMD_BYTES);
+    ASSUME_ALIGNED(Cb_z, SIMD_BYTES);
 
     double const inv_dx{ 1.0 / dx_ };
     double const inv_dy{ 1.0 / dy_ };
@@ -153,31 +209,34 @@ void Grid::update_E() {
                 std::size_t const i{ base + x };
 
                 double const curl_x{
-                    ( Bz[i] - Bz[i - Sy] ) * inv_dy
-                  - ( By[i] - By[i - Sz] ) * inv_dz
+                    ( Hz[i] - Hz[i - Sy] ) * inv_dy
+                  - ( Hy[i] - Hy[i - Sz] ) * inv_dz
                 };
                 double const curl_y{
-                    ( Bx[i] - Bx[i - Sz] ) * inv_dz
-                  - ( Bz[i] - Bz[i - 1]  ) * inv_dx
+                    ( Hx[i] - Hx[i - Sz] ) * inv_dz
+                  - ( Hz[i] - Hz[i - 1]  ) * inv_dx
                 };
                 double const curl_z{
-                    ( By[i] - By[i - 1]  ) * inv_dx
-                  - ( Bx[i] - Bx[i - Sy] ) * inv_dy
+                    ( Hy[i] - Hy[i - 1]  ) * inv_dx
+                  - ( Hx[i] - Hx[i - Sy] ) * inv_dy
                 };
 
-                Ex[i] += dt_c_sq * curl_x - Jx[i] * dt_inv_eps;
-                Ey[i] += dt_c_sq * curl_y - Jy[i] * dt_inv_eps;
-                Ez[i] += dt_c_sq * curl_z - Jz[i] * dt_inv_eps;
+                Ex[i] = Ca_x[i] * Ex[i] + Cb_x[i] * ( curl_x - Jx[i] );
+                Ey[i] = Ca_y[i] * Ey[i] + Cb_y[i] * ( curl_y - Jy[i] );
+                Ez[i] = Ca_z[i] * Ez[i] + Cb_z[i] * ( curl_z - Jz[i] );
             }
         }
     }
-    pml_.update_E_psi( Ex_ptr(), Ey_ptr(), Ez_ptr(),
-                       Bx_ptr(), By_ptr(), Bz_ptr(),
-                       dt_, dx_, dy_, dz_, c_sq_ );
+
+    pml_.update_E_psi(
+        Ex_ptr(), Ey_ptr(), Ez_ptr(),
+        Hx_ptr(), Hy_ptr(), Hz_ptr(),
+        dt_, dx_, dy_, dz_
+    );
 }
 
 void Grid::step() {
-    update_B();
+    update_H();
     update_E();
 }
 
@@ -193,9 +252,9 @@ double Grid::field(
         }
     } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case Component::X: return Bx_ptr()[i];
-            case Component::Y: return By_ptr()[i];
-            case Component::Z: return Bz_ptr()[i];
+            case Component::X: return Hx_ptr()[i];
+            case Component::Y: return Hy_ptr()[i];
+            case Component::Z: return Hz_ptr()[i];
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
@@ -213,9 +272,9 @@ double &Grid::field(
         }
     } else if ( field == Field::MAGNETIC ) {
         switch ( component ) {
-            case Component::X: return Bx_ptr()[i];
-            case Component::Y: return By_ptr()[i];
-            case Component::Z: return Bz_ptr()[i];
+            case Component::X: return Hx_ptr()[i];
+            case Component::Y: return Hy_ptr()[i];
+            case Component::Z: return Hz_ptr()[i];
         }
     }
     throw std::invalid_argument{ "Invalid field or component specifier" };
@@ -231,19 +290,17 @@ double Grid::field_magnitude(
     return std::sqrt( Fx*Fx + Fy*Fy + Fz*Fz );
 }
 
-double Grid::total_energy() const {
+double Grid::e_energy() const {
     double energy{};
     double const dV{ dx_ * dy_ * dz_ };
 
     double const* RESTRICT Ex{ Ex_ptr() };
     double const* RESTRICT Ey{ Ey_ptr() };
     double const* RESTRICT Ez{ Ez_ptr() };
-    double const* RESTRICT Bx{ Bx_ptr() };
-    double const* RESTRICT By{ By_ptr() };
-    double const* RESTRICT Bz{ Bz_ptr() };
 
-    double const inv_mu{ 1.0 / mu_ };
-    double const eps_local{ eps_ };
+    double const* RESTRICT eps_x{ eps_x_ptr() };
+    double const* RESTRICT eps_y{ eps_y_ptr() };
+    double const* RESTRICT eps_z{ eps_z_ptr() };
 
     std::size_t const Sy{ Nx_padded_ };
     std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
@@ -251,17 +308,50 @@ double Grid::total_energy() const {
     #pragma omp parallel for collapse( 2 ) reduction( +:energy )
     for ( std::size_t z = 0; z < Nz_; ++z ) {
         for ( std::size_t y = 0; y < Ny_; ++y ) {
+            
             std::size_t const base{ y * Sy + z * Sz };
-
             for ( std::size_t x = 0; x < Nx_; ++x ) {
                 std::size_t const i{ base + x };
-
-                double const E_sq{ Ex[i]*Ex[i] + Ey[i]*Ey[i] + Ez[i]*Ez[i] };
-                double const B_sq{ Bx[i]*Bx[i] + By[i]*By[i] + Bz[i]*Bz[i] };
-
-                energy += 0.5 * ( eps_local * E_sq + B_sq * inv_mu );
+                energy += eps_x[i] * Ex[i]*Ex[i]
+                        + eps_y[i] * Ey[i]*Ey[i]
+                        + eps_z[i] * Ez[i]*Ez[i];
             }
         }
     }
-    return energy * dV;
+    return 0.5 * energy * dV;
+}
+
+double Grid::h_energy() const {
+    double energy{};
+    double const dV{ dx_ * dy_ * dz_ };
+
+    double const* RESTRICT Hx{ Hx_ptr() };
+    double const* RESTRICT Hy{ Hy_ptr() };
+    double const* RESTRICT Hz{ Hz_ptr() };
+
+    double const* RESTRICT mu_x{ mu_x_ptr() };
+    double const* RESTRICT mu_y{ mu_y_ptr() };
+    double const* RESTRICT mu_z{ mu_z_ptr() };
+
+    std::size_t const Sy{ Nx_padded_ };
+    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+
+    #pragma omp parallel for collapse( 2 ) reduction( +:energy )
+    for ( std::size_t z = 0; z < Nz_; ++z ) {
+        for ( std::size_t y = 0; y < Ny_; ++y ) {
+
+            std::size_t const base{ y * Sy + z * Sz };
+            for ( std::size_t x = 0; x < Nx_; ++x ) {
+                std::size_t const i{ base + x };
+                energy += mu_x[i] * Hx[i]*Hx[i]
+                        + mu_y[i] * Hy[i]*Hy[i]
+                        + mu_z[i] * Hz[i]*Hz[i];
+            }
+        }
+    }
+    return 0.5 * energy * dV;
+}
+
+double Grid::total_energy() const {
+    return e_energy() + h_energy();
 }

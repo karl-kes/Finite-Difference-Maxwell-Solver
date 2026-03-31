@@ -45,8 +45,6 @@ public:
     double pml_alpha_max{ 0.3 };
 
     // Derived (computed from above):
-    std::size_t size{};
-    double c{};
     double dt{};
     std::size_t pml_thickness{};
     double pml_sigma_max{};
@@ -99,18 +97,22 @@ public:
         return total_steps / 1000;
     }
 
-private:
     void compute_derived() {
-        size          = ( Nx + 1 ) * ( Ny + 1 ) * ( Nz + 1 );
-        c             = 1.0 / std::sqrt( mu * eps );
-        dt            = cfl_factor / ( c * std::sqrt( 1.0 / ( dx * dx )
-                      + 1.0 / ( dy * dy ) + 1.0 / ( dz * dz ) ) );
+        double const c{ 1.0 / std::sqrt( mu * eps ) };
+        std::size_t const size{ Nx * Ny * Nz };
+
+        dt = cfl_factor / ( c * std::sqrt( 1.0 / ( dx * dx ) + 
+                                           1.0 / ( dy * dy ) + 
+                                           1.0 / ( dz * dz )
+                                         ) 
+                          );
         pml_thickness = static_cast<std::size_t>( std::cbrt(
-                            static_cast<double>( size ) ) / 8.0 );
+                            static_cast<double>( size ) ) / 6.0 );
         pml_sigma_max = 0.8 * ( pml_order + 1 )
                       / ( dx * std::sqrt( mu / eps ) );
     }
 
+private:
     // Because C++ is so ugly:
     using Map = std::unordered_map<std::string, std::string>;
 

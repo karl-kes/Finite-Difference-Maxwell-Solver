@@ -35,12 +35,12 @@ void Output::initialize( Grid const &grid ) {
     }
     file_E_.write( reinterpret_cast<char const*>( dimensions_ ), sizeof( dimensions_ ) );
 
-    std::string path_B{ base_path_ + "/B.bin" };
-    file_B_.open( path_B, std::ios::binary | std::ios::out );
-    if ( !file_B_.is_open() ) {
+    std::string path_B{ base_path_ + "/H.bin" };
+    file_H_.open( path_B, std::ios::binary | std::ios::out );
+    if ( !file_H_.is_open() ) {
         throw std::runtime_error{ "Failed to open file: " + path_B };
     }
-    file_B_.write( reinterpret_cast<char const*>( dimensions_ ), sizeof( dimensions_ ) );
+    file_H_.write( reinterpret_cast<char const*>( dimensions_ ), sizeof( dimensions_ ) );
 
     shutdown_ = false;
     has_work_ = false;
@@ -56,12 +56,12 @@ void Output::writer_loop() {
 
         int flush_buf{ 1 - active_buf_ };
         double const* e_ptr{ buffers_[flush_buf].data() };
-        double const* b_ptr{ buffers_[flush_buf].data() + volume_size_ };
+        double const* h_ptr{ buffers_[flush_buf].data() + volume_size_ };
         std::size_t size{ volume_size_ };
 
         lock.unlock();
 
-        flush_buffer( e_ptr, b_ptr, size );
+        flush_buffer( e_ptr, h_ptr, size );
 
         {
             std::lock_guard<std::mutex> done_lock{ mtx_ };
@@ -78,7 +78,7 @@ void Output::write_field( Grid const &grid ) {
     }
 
     double* e_buf{ buffers_[active_buf_].data() };
-    double* b_buf{ buffers_[active_buf_].data() + volume_size_ };
+    double* h_buf{ buffers_[active_buf_].data() + volume_size_ };
 
     double const* RESTRICT Ex{ grid.Ex_ptr() };
     double const* RESTRICT Ey{ grid.Ey_ptr() };
@@ -99,9 +99,9 @@ void Output::write_field( Grid const &grid ) {
         }
     }
 
-    double const* RESTRICT Bx{ grid.Bx_ptr() };
-    double const* RESTRICT By{ grid.By_ptr() };
-    double const* RESTRICT Bz{ grid.Bz_ptr() };
+    double const* RESTRICT Hx{ grid.Hx_ptr() };
+    double const* RESTRICT Hy{ grid.Hy_ptr() };
+    double const* RESTRICT Hz{ grid.Hz_ptr() };
 
     idx = 0;
     for ( std::size_t z = 0; z < nz; ++z ) {
@@ -110,9 +110,9 @@ void Output::write_field( Grid const &grid ) {
             std::size_t const base{ y * Sy + z * Sz };
             for ( std::size_t x = 0; x < nx; ++x ) {
                 std::size_t const i{ base + x };
-                b_buf[idx    ] = 0.5 * ( Bx[i] + Bx[i + Sx] );
-                b_buf[idx + 1] = 0.5 * ( By[i] + By[i + Sy] );
-                b_buf[idx + 2] = 0.5 * ( Bz[i] + Bz[i + Sz] );
+                h_buf[idx    ] = 0.5 * ( Hx[i] + Hx[i + Sx] );
+                h_buf[idx + 1] = 0.5 * ( Hy[i] + Hy[i + Sy] );
+                h_buf[idx + 2] = 0.5 * ( Hz[i] + Hz[i + Sz] );
                 idx += 3;
             }
         }
@@ -129,7 +129,7 @@ void Output::write_field( Grid const &grid ) {
 void Output::flush_buffer( double const* e_data, double const* b_data, std::size_t size ) {
     auto const bytes{ static_cast<std::streamsize>( size * sizeof( double ) ) };
     file_E_.write( reinterpret_cast<char const*>( e_data ), bytes );
-    file_B_.write( reinterpret_cast<char const*>( b_data ), bytes );
+    file_H_.write( reinterpret_cast<char const*>( b_data ), bytes );
 }
 
 void Output::finalize() {
@@ -141,5 +141,5 @@ void Output::finalize() {
     cv_ready_.notify_one();
     if ( writer_thread_.joinable() ) writer_thread_.join();
     if ( file_E_.is_open() ) file_E_.close();
-    if ( file_B_.is_open() ) file_B_.close();
+    if ( file_H_.is_open() ) file_H_.close();
 }

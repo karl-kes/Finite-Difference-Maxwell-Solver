@@ -29,23 +29,6 @@ TEST(Grid, PaddedDimensionsAligned) {
     ASSERT_EQ( grid.Nz_padded() % elems, std::size_t{0} );
 }
 
-TEST(Grid, PhysicalConstantsConsistent) {
-    Simulation_Config cfg{};
-    Grid grid{ cfg };
-
-    // c = 1/sqrt(mu*eps):
-    double expected_c = 1.0 / std::sqrt( cfg.mu * cfg.eps );
-    ASSERT_NEAR( grid.c(), expected_c, 1e-14 );
-
-    // c^2:
-    ASSERT_NEAR( grid.c_sq(), expected_c * expected_c, 1e-14 );
-
-    // CFL condition: dt <= cfl_factor / (c * sqrt(1/dx^2 + 1/dy^2 + 1/dz^2)):
-    double cfl_limit = cfg.cfl_factor / ( expected_c * std::sqrt(
-        1.0/(cfg.dx*cfg.dx) + 1.0/(cfg.dy*cfg.dy) + 1.0/(cfg.dz*cfg.dz) ) );
-    ASSERT_NEAR( grid.dt(), cfl_limit, 1e-14 );
-}
-
 TEST(Grid, FieldsInitializedToZero) {
     Simulation_Config cfg{};
     Grid grid{ cfg };
@@ -94,23 +77,8 @@ TEST(Grid, FieldWriteRead) {
     ASSERT_NEAR( grid.field( Field::ELECTRIC, Component::Y, 50, 50, 50 ), 3.14, 1e-15 );
 
     // Also through raw pointer:
-    grid.Bz_ptr()[ grid.idx(25, 30, 35) ] = -2.71;
+    grid.Hz_ptr()[ grid.idx(25, 30, 35) ] = -2.71;
     ASSERT_NEAR( grid.field( Field::MAGNETIC, Component::Z, 25, 30, 35 ), -2.71, 1e-15 );
-}
-
-TEST(Grid, EnergyPositiveDefinite) {
-    Simulation_Config cfg{};
-    Grid grid{ cfg };
-
-    // Set a single nonzero E-field component:
-    grid.field( Field::ELECTRIC, Component::X, 50, 50, 50 ) = 1.0;
-    double energy = grid.total_energy();
-    ASSERT_GT( energy, 0.0 );
-
-    // Energy should be 0.5 * eps * Ex^2 * dV for that single cell:
-    double dV = grid.dx() * grid.dy() * grid.dz();
-    double expected = 0.5 * grid.eps() * 1.0 * dV;
-    ASSERT_NEAR( energy, expected, 1e-10 );
 }
 
 // ============================================================================

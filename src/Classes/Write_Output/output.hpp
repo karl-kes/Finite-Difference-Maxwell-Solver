@@ -26,7 +26,7 @@ private:
 
     std::string base_path_;
     std::ofstream file_E_;
-    std::ofstream file_B_;
+    std::ofstream file_H_;
     uint64_t dimensions_[3]{};
 
     std::size_t volume_size_{};
@@ -41,7 +41,7 @@ private:
     bool shutdown_{ false };
 
     void writer_loop();
-    void flush_buffer( double const* e_data, double const* b_data, std::size_t size );
+    void flush_buffer( double const* e_data, double const* h_data, std::size_t size );
 
 public:
     Output( std::string const &base_path = "Output" )

@@ -21,6 +21,8 @@ private:
 
     double wavelength_;
     double wavenumber_;
+    double c_;
+    double eta_;
 
     std::size_t probe_x_, probe_y_, probe_z_;
     double initial_phase_;

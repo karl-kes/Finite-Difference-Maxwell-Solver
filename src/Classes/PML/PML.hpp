@@ -66,17 +66,16 @@ private:
 public:
     explicit PML( Simulation_Config const &config );
 
-    void update_B_psi(
+    void update_H_psi(
         double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
-        double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
+        double* RESTRICT Hx, double* RESTRICT Hy, double* RESTRICT Hz,
         double const dt, double const dx, double const dy, double const dz
     );
 
     void update_E_psi(
         double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
-        double* RESTRICT Bx, double* RESTRICT By, double* RESTRICT Bz,
-        double const dt, double const dx, double const dy, double const dz,
-        double const c_sq
+        double* RESTRICT Hx, double* RESTRICT Hy, double* RESTRICT Hz,
+        double const dt, double const dx, double const dy, double const dz
     );
 
     [[nodiscard]] std::size_t thickness() const { return thickness_; }

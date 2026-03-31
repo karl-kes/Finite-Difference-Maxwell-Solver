@@ -22,8 +22,9 @@ void Simulation::initialize() {
     // Begin Outputs:
     output_.initialize( grid_ );
 
-    double const freq{ grid_.c() / ( 20.0 * grid_.dx() ) };
-    std::size_t z{ grid_.Nz()/2 };
+    double const c{ 1.0 / std::sqrt( config_.eps * config_.mu ) };
+    double const freq{ c / ( grid_.Nx()/2 * grid_.dx() ) };
+    std::size_t const z{ grid_.Nz()/2 };
     grid_.add_source( std::make_unique<AC_Current_Loop>(
         1.0,                     // amplitude
         freq,                    // frequency
