@@ -1,8 +1,10 @@
 #include "test_framework.hpp"
 #include "test_helpers.hpp"
+
 #include "../src/Classes/Config/config.hpp"
 #include "../src/Classes/Grid/grid.hpp"
 #include "../src/Classes/Source/source.hpp"
+
 #include <cmath>
 #include <numbers>
 #include <vector>

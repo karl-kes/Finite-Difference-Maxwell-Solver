@@ -21,14 +21,14 @@ PML::PML( Simulation_Config const &config )
 , psi_face_x_{ thickness_ * Ny_ * Nz_ }
 , psi_face_y_{ Nx_ * thickness_ * Nz_ }
 , psi_face_z_{ Nx_ * Ny_ * thickness_ } {
-    if ( !config.use_pml || thickness_ == 0 ) return;
+    if ( !config.use_pml || thickness() == 0 ) return;
 
-    coeffs_ = AlignedSoA<double>{ thickness_, NUM_COEFF_ARRAYS_ };
+    coeffs_ = AlignedSoA<double>{ thickness(), NUM_COEFF_ARRAYS_ };
 
-    std::size_t const max_face{ std::max({ psi_face_x_, psi_face_y_, psi_face_z_ }) };
+    std::size_t const max_face{ std::max({ psi_face_x(), psi_face_y(), psi_face_z() }) };
     psi_ = AlignedSoA<double>{ 2 * max_face, NUM_PSI_ARRAYS_ };
 
-    double const d{ static_cast<double>( thickness_ ) };
+    double const d{ static_cast<double>( thickness() ) };
 
     double* RESTRICT b_Ex{ b_Ex_ptr() }; double* RESTRICT c_Ex{ c_Ex_ptr() }; double* RESTRICT kappa_Ex{ kappa_Ex_ptr() };
     double* RESTRICT b_Hx{ b_Hx_ptr() }; double* RESTRICT c_Hx{ c_Hx_ptr() }; double* RESTRICT kappa_Hx{ kappa_Hx_ptr() };
@@ -37,7 +37,8 @@ PML::PML( Simulation_Config const &config )
     double* RESTRICT b_Ez{ b_Ez_ptr() }; double* RESTRICT c_Ez{ c_Ez_ptr() }; double* RESTRICT kappa_Ez{ kappa_Ez_ptr() };
     double* RESTRICT b_Hz{ b_Hz_ptr() }; double* RESTRICT c_Hz{ c_Hz_ptr() }; double* RESTRICT kappa_Hz{ kappa_Hz_ptr() };
 
-    for ( std::size_t i{ 0 }; i < thickness_; ++i ) {
+    std::size_t const t{ thickness() };
+    for ( std::size_t i{ 0 }; i < t; ++i ) {
         double const depth_E{ ( d - static_cast<double>( i ) ) / d };
         double const kap_E{ kappa( depth_E ) };
         double const alp_E{ alpha( depth_E ) };
@@ -70,17 +71,18 @@ PML::PML( Simulation_Config const &config )
 void PML::update_H_psi(
     double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
     double* RESTRICT Hx, double* RESTRICT Hy, double* RESTRICT Hz,
-    double const dt, double const dx, double const dy, double const dz ) {
+    double const* RESTRICT Db_x, double const* RESTRICT Db_y, double const* RESTRICT Db_z,
+    double const dx, double const dy, double const dz ) {
     if ( !is_active() ) return;
 
-    std::size_t const t{ thickness_ };
-    std::size_t const face_x{ psi_face_x_ };
-    std::size_t const face_y{ psi_face_y_ };
-    std::size_t const face_z{ psi_face_z_ };
+    std::size_t const t{ thickness() };
+    std::size_t const face_x{ psi_face_x() };
+    std::size_t const face_y{ psi_face_y() };
+    std::size_t const face_z{ psi_face_z() };
 
     std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx_padded_ };
-    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     double const inv_dx{ 1.0 / dx };
     double const inv_dy{ 1.0 / dy };
@@ -107,18 +109,18 @@ void PML::update_H_psi(
     ASSUME_ALIGNED(bHz, SIMD_BYTES);
     ASSUME_ALIGNED(cHz, SIMD_BYTES);
 
-    std::size_t const nx{ Nx_ };
-    std::size_t const ny{ Ny_ };
-    std::size_t const nz{ Nz_ };
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
 
-    std::size_t const x_hi_base{ nx - 1 - t };
+    std::size_t const x_hi_base{ Nx_local - 1 - t };
 
     // x-faces
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 0; z < nz - 1; ++z ) {
-        for ( std::size_t y = 0; y < ny - 1; ++y ) {
+    for ( std::size_t z = 0; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 0; y < Ny_local - 1; ++y ) {
             std::size_t const yz_grid_base{ y * Sy + z * Sz };
-            std::size_t const yz_psi_base{ t * ( y + ny * z ) };
+            std::size_t const yz_psi_base{ t * ( y + Ny_local * z ) };
 
             for ( std::size_t d = 0; d < t; ++d ) {
                 std::size_t const gi_lo{ yz_grid_base + d };
@@ -133,8 +135,8 @@ void PML::update_H_psi(
                 pHyx[pi_lo] = b_lo * pHyx[pi_lo] + c_lo * dEy_lo;
                 pHzx[pi_lo] = b_lo * pHzx[pi_lo] + c_lo * dEz_lo;
 
-                Hz[gi_lo] -= dt * pHyx[pi_lo];
-                Hy[gi_lo] += dt * pHzx[pi_lo];
+                Hz[gi_lo] -= Db_z[gi_lo] * pHyx[pi_lo];
+                Hy[gi_lo] += Db_y[gi_lo] * pHzx[pi_lo];
 
                 std::size_t const gi_hi{ yz_grid_base + x_hi_base + d };
                 std::size_t const pi_hi{ face_x + pi_lo };
@@ -148,24 +150,24 @@ void PML::update_H_psi(
                 pHyx[pi_hi] = b_hi * pHyx[pi_hi] + c_hi * dEy_hi;
                 pHzx[pi_hi] = b_hi * pHzx[pi_hi] + c_hi * dEz_hi;
 
-                Hz[gi_hi] -= dt * pHyx[pi_hi];
-                Hy[gi_hi] += dt * pHzx[pi_hi];
+                Hz[gi_hi] -= Db_z[gi_hi] * pHyx[pi_hi];
+                Hy[gi_hi] += Db_y[gi_hi] * pHzx[pi_hi];
             }
         }
     }
 
     // y-faces
-    std::size_t const y_hi_base{ ny - 1 - t };
+    std::size_t const y_hi_base{ Ny_local - 1 - t };
 
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 0; z < nz - 1; ++z ) {
-        for ( std::size_t x = 0; x < nx - 1; ++x ) {
+    for ( std::size_t z = 0; z < Nz_local - 1; ++z ) {
+        for ( std::size_t x = 0; x < Nx_local - 1; ++x ) {
             std::size_t const xz_grid_base{ x + z * Sz };
-            std::size_t const xz_psi_base{ x + nx * t * z };
+            std::size_t const xz_psi_base{ x + Nx_local * t * z };
 
             for ( std::size_t d = 0; d < t; ++d ) {
                 std::size_t const gi_lo{ xz_grid_base + d * Sy };
-                std::size_t const pi_lo{ xz_psi_base + nx * d };
+                std::size_t const pi_lo{ xz_psi_base + Nx_local * d };
 
                 double const dEx_lo{ ( Ex[gi_lo + Sy] - Ex[gi_lo] ) * inv_dy };
                 double const dEz_lo{ ( Ez[gi_lo + Sy] - Ez[gi_lo] ) * inv_dy };
@@ -176,8 +178,8 @@ void PML::update_H_psi(
                 pHxy[pi_lo] = b_lo * pHxy[pi_lo] + c_lo * dEx_lo;
                 pHzy[pi_lo] = b_lo * pHzy[pi_lo] + c_lo * dEz_lo;
 
-                Hz[gi_lo] += dt * pHxy[pi_lo];
-                Hx[gi_lo] -= dt * pHzy[pi_lo];
+                Hz[gi_lo] += Db_z[gi_lo] * pHxy[pi_lo];
+                Hx[gi_lo] -= Db_x[gi_lo] * pHzy[pi_lo];
 
                 std::size_t const gi_hi{ xz_grid_base + ( y_hi_base + d ) * Sy };
                 std::size_t const pi_hi{ face_y + pi_lo };
@@ -191,24 +193,24 @@ void PML::update_H_psi(
                 pHxy[pi_hi] = b_hi * pHxy[pi_hi] + c_hi * dEx_hi;
                 pHzy[pi_hi] = b_hi * pHzy[pi_hi] + c_hi * dEz_hi;
 
-                Hz[gi_hi] += dt * pHxy[pi_hi];
-                Hx[gi_hi] -= dt * pHzy[pi_hi];
+                Hz[gi_hi] += Db_z[gi_hi] * pHxy[pi_hi];
+                Hx[gi_hi] -= Db_x[gi_hi] * pHzy[pi_hi];
             }
         }
     }
 
     // z-faces
-    std::size_t const z_hi_base{ nz - 1 - t };
+    std::size_t const z_hi_base{ Nz_local - 1 - t };
 
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t y = 0; y < ny - 1; ++y ) {
-        for ( std::size_t x = 0; x < nx - 1; ++x ) {
+    for ( std::size_t y = 0; y < Ny_local - 1; ++y ) {
+        for ( std::size_t x = 0; x < Nx_local - 1; ++x ) {
             std::size_t const xy_grid_base{ x + y * Sy };
-            std::size_t const xy_psi_base{ x + nx * y };
+            std::size_t const xy_psi_base{ x + Nx_local * y };
 
             for ( std::size_t d = 0; d < t; ++d ) {
                 std::size_t const gi_lo{ xy_grid_base + d * Sz };
-                std::size_t const pi_lo{ xy_psi_base + nx * ny * d };
+                std::size_t const pi_lo{ xy_psi_base + Nx_local * Ny_local * d };
 
                 double const dEx_lo{ ( Ex[gi_lo + Sz] - Ex[gi_lo] ) * inv_dz };
                 double const dEy_lo{ ( Ey[gi_lo + Sz] - Ey[gi_lo] ) * inv_dz };
@@ -219,8 +221,8 @@ void PML::update_H_psi(
                 pHxz[pi_lo] = b_lo * pHxz[pi_lo] + c_lo * dEx_lo;
                 pHyz[pi_lo] = b_lo * pHyz[pi_lo] + c_lo * dEy_lo;
 
-                Hx[gi_lo] += dt * pHyz[pi_lo];
-                Hy[gi_lo] -= dt * pHxz[pi_lo];
+                Hx[gi_lo] += Db_x[gi_lo] * pHyz[pi_lo];
+                Hy[gi_lo] -= Db_y[gi_lo] * pHxz[pi_lo];
 
                 std::size_t const gi_hi{ xy_grid_base + ( z_hi_base + d ) * Sz };
                 std::size_t const pi_hi{ face_z + pi_lo };
@@ -234,8 +236,8 @@ void PML::update_H_psi(
                 pHxz[pi_hi] = b_hi * pHxz[pi_hi] + c_hi * dEx_hi;
                 pHyz[pi_hi] = b_hi * pHyz[pi_hi] + c_hi * dEy_hi;
 
-                Hx[gi_hi] += dt * pHyz[pi_hi];
-                Hy[gi_hi] -= dt * pHxz[pi_hi];
+                Hx[gi_hi] += Db_x[gi_hi] * pHyz[pi_hi];
+                Hy[gi_hi] -= Db_y[gi_hi] * pHxz[pi_hi];
             }
         }
     }
@@ -244,17 +246,18 @@ void PML::update_H_psi(
 void PML::update_E_psi(
     double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
     double* RESTRICT Hx, double* RESTRICT Hy, double* RESTRICT Hz,
-    double const dt, double const dx, double const dy, double const dz ) {
+    double const* RESTRICT Cb_x, double const* RESTRICT Cb_y, double const* RESTRICT Cb_z,
+    double const dx, double const dy, double const dz ) {
     if ( !is_active() ) return;
 
-    std::size_t const t{ thickness_ };
-    std::size_t const face_x{ psi_face_x_ };
-    std::size_t const face_y{ psi_face_y_ };
-    std::size_t const face_z{ psi_face_z_ };
+    std::size_t const t{ thickness() };
+    std::size_t const face_x{ psi_face_x() };
+    std::size_t const face_y{ psi_face_y() };
+    std::size_t const face_z{ psi_face_z() };
 
     std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx_padded_ };
-    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     double const inv_dx{ 1.0 / dx };
     double const inv_dy{ 1.0 / dy };
@@ -281,28 +284,28 @@ void PML::update_E_psi(
     ASSUME_ALIGNED(bEz, SIMD_BYTES);
     ASSUME_ALIGNED(cEz, SIMD_BYTES);
 
-    std::size_t const nx{ Nx_ };
-    std::size_t const ny{ Ny_ };
-    std::size_t const nz{ Nz_ };
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
 
-    std::size_t const d_max_lo_x{ std::min( t, nx - 2 ) };
+    std::size_t const d_max_lo_x{ std::min( t, Nx_local - 2 ) };
     std::size_t const d_max_hi_x{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
-    std::size_t const x_hi_base{ nx - t };
+    std::size_t const x_hi_base{ Nx_local - t };
 
-    std::size_t const d_max_lo_y{ std::min( t, ny - 2 ) };
+    std::size_t const d_max_lo_y{ std::min( t, Ny_local - 2 ) };
     std::size_t const d_max_hi_y{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
-    std::size_t const y_hi_base{ ny - t };
+    std::size_t const y_hi_base{ Ny_local - t };
 
-    std::size_t const d_max_lo_z{ std::min( t, nz - 2 ) };
+    std::size_t const d_max_lo_z{ std::min( t, Nz_local - 2 ) };
     std::size_t const d_max_hi_z{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
-    std::size_t const z_hi_base{ nz - t };
+    std::size_t const z_hi_base{ Nz_local - t };
 
     // x-faces
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 1; z < nz - 1; ++z ) {
-        for ( std::size_t y = 1; y < ny - 1; ++y ) {
+    for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
             std::size_t const yz_grid_base{ y * Sy + z * Sz };
-            std::size_t const yz_psi_base{ t * ( y + ny * z ) };
+            std::size_t const yz_psi_base{ t * ( y + Ny_local * z ) };
 
             for ( std::size_t d = 0; d < d_max_lo_x; ++d ) {
                 std::size_t const gi{ yz_grid_base + d + 1 };
@@ -314,8 +317,8 @@ void PML::update_E_psi(
                 pEyx[pi] = bEx[d] * pEyx[pi] + cEx[d] * dHy;
                 pEzx[pi] = bEx[d] * pEzx[pi] + cEx[d] * dHz;
 
-                Ez[gi] += dt * pEyx[pi];
-                Ey[gi] -= dt * pEzx[pi];
+                Ez[gi] += Cb_z[gi] * pEyx[pi];
+                Ey[gi] -= Cb_y[gi] * pEzx[pi];
             }
 
             for ( std::size_t d = 0; d < d_max_hi_x; ++d ) {
@@ -330,22 +333,22 @@ void PML::update_E_psi(
                 pEyx[pi] = bEx[rd] * pEyx[pi] + cEx[rd] * dHy;
                 pEzx[pi] = bEx[rd] * pEzx[pi] + cEx[rd] * dHz;
 
-                Ez[gi] += dt * pEyx[pi];
-                Ey[gi] -= dt * pEzx[pi];
+                Ez[gi] += Cb_z[gi] * pEyx[pi];
+                Ey[gi] -= Cb_y[gi] * pEzx[pi];
             }
         }
     }
 
     // y-faces
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t z = 1; z < nz - 1; ++z ) {
-        for ( std::size_t x = 1; x < nx - 1; ++x ) {
+    for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
+        for ( std::size_t x = 1; x < Nx_local - 1; ++x ) {
             std::size_t const xz_grid_base{ x + z * Sz };
-            std::size_t const xz_psi_base{ x + nx * t * z };
+            std::size_t const xz_psi_base{ x + Nx_local * t * z };
 
             for ( std::size_t d = 0; d < d_max_lo_y; ++d ) {
                 std::size_t const gi{ xz_grid_base + ( d + 1 ) * Sy };
-                std::size_t const pi{ xz_psi_base + nx * d };
+                std::size_t const pi{ xz_psi_base + Nx_local * d };
 
                 double const dHx{ ( Hx[gi] - Hx[gi - Sy] ) * inv_dy };
                 double const dHz{ ( Hz[gi] - Hz[gi - Sy] ) * inv_dy };
@@ -353,13 +356,13 @@ void PML::update_E_psi(
                 pExy[pi] = bEy[d] * pExy[pi] + cEy[d] * dHx;
                 pEzy[pi] = bEy[d] * pEzy[pi] + cEy[d] * dHz;
 
-                Ez[gi] -= dt * pExy[pi];
-                Ex[gi] += dt * pEzy[pi];
+                Ez[gi] -= Cb_z[gi] * pExy[pi];
+                Ex[gi] += Cb_x[gi] * pEzy[pi];
             }
 
             for ( std::size_t d = 0; d < d_max_hi_y; ++d ) {
                 std::size_t const gi{ xz_grid_base + ( y_hi_base + d ) * Sy };
-                std::size_t const pi{ face_y + xz_psi_base + nx * d };
+                std::size_t const pi{ face_y + xz_psi_base + Nx_local * d };
 
                 double const dHx{ ( Hx[gi] - Hx[gi - Sy] ) * inv_dy };
                 double const dHz{ ( Hz[gi] - Hz[gi - Sy] ) * inv_dy };
@@ -369,22 +372,22 @@ void PML::update_E_psi(
                 pExy[pi] = bEy[rd] * pExy[pi] + cEy[rd] * dHx;
                 pEzy[pi] = bEy[rd] * pEzy[pi] + cEy[rd] * dHz;
 
-                Ez[gi] -= dt * pExy[pi];
-                Ex[gi] += dt * pEzy[pi];
+                Ez[gi] -= Cb_z[gi] * pExy[pi];
+                Ex[gi] += Cb_x[gi] * pEzy[pi];
             }
         }
     }
 
     // z-faces
     #pragma omp parallel for collapse( 2 )
-    for ( std::size_t y = 1; y < ny - 1; ++y ) {
-        for ( std::size_t x = 1; x < nx - 1; ++x ) {
+    for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
+        for ( std::size_t x = 1; x < Nx_local - 1; ++x ) {
             std::size_t const xy_grid_base{ x + y * Sy };
-            std::size_t const xy_psi_base{ x + nx * y };
+            std::size_t const xy_psi_base{ x + Nx_local * y };
 
             for ( std::size_t d = 0; d < d_max_lo_z; ++d ) {
                 std::size_t const gi{ xy_grid_base + ( d + 1 ) * Sz };
-                std::size_t const pi{ xy_psi_base + nx * ny * d };
+                std::size_t const pi{ xy_psi_base + Nx_local * Ny_local * d };
 
                 double const dHx{ ( Hx[gi] - Hx[gi - Sz] ) * inv_dz };
                 double const dHy{ ( Hy[gi] - Hy[gi - Sz] ) * inv_dz };
@@ -392,13 +395,13 @@ void PML::update_E_psi(
                 pExz[pi] = bEz[d] * pExz[pi] + cEz[d] * dHx;
                 pEyz[pi] = bEz[d] * pEyz[pi] + cEz[d] * dHy;
 
-                Ey[gi] += dt * pExz[pi];
-                Ex[gi] -= dt * pEyz[pi];
+                Ey[gi] += Cb_y[gi] * pExz[pi];
+                Ex[gi] -= Cb_x[gi] * pEyz[pi];
             }
 
             for ( std::size_t d = 0; d < d_max_hi_z; ++d ) {
                 std::size_t const gi{ xy_grid_base + ( z_hi_base + d ) * Sz };
-                std::size_t const pi{ face_z + xy_psi_base + nx * ny * d };
+                std::size_t const pi{ face_z + xy_psi_base + Nx_local * Ny_local * d };
 
                 double const dHx{ ( Hx[gi] - Hx[gi - Sz] ) * inv_dz };
                 double const dHy{ ( Hy[gi] - Hy[gi - Sz] ) * inv_dz };
@@ -408,8 +411,8 @@ void PML::update_E_psi(
                 pExz[pi] = bEz[rd] * pExz[pi] + cEz[rd] * dHx;
                 pEyz[pi] = bEz[rd] * pEyz[pi] + cEz[rd] * dHy;
 
-                Ey[gi] += dt * pExz[pi];
-                Ex[gi] -= dt * pEyz[pi];
+                Ey[gi] += Cb_y[gi] * pExz[pi];
+                Ex[gi] -= Cb_x[gi] * pEyz[pi];
             }
         }
     }

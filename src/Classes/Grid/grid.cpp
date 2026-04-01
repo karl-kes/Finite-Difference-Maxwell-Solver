@@ -152,7 +152,8 @@ void Grid::update_H() {
     pml_.update_H_psi(
         Ex_ptr(), Ey_ptr(), Ez_ptr(),
         Hx_ptr(), Hy_ptr(), Hz_ptr(),
-        dt(), dx(), dy(), dz() 
+        Db_x_ptr(), Db_y_ptr(), Db_z_ptr(),
+        dx(), dy(), dz() 
     );    
 }
 
@@ -243,7 +244,8 @@ void Grid::update_E() {
     pml_.update_E_psi(
         Ex_ptr(), Ey_ptr(), Ez_ptr(),
         Hx_ptr(), Hy_ptr(), Hz_ptr(),
-        dt(), dx(), dy(), dz()
+        Cb_x_ptr(), Cb_y_ptr(), Cb_z_ptr(),
+        dx(), dy(), dz()
     );
 }
 

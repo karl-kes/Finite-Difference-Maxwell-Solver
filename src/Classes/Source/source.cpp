@@ -56,7 +56,7 @@ void AC_Concentric_Rings::apply( Grid &grid, std::size_t const time_step ) {
     std::size_t const y_outer_max{ 3 * grid.Ny() / 4 };
 
     // Total number of rings
-    std::size_t const num_rings{ 2 };
+    std::size_t const num_rings{ 3 };
 
     // Calculate the distance to shrink inward for each successive ring.
     // Dividing by (2 * numrings) ensures the innermost ring doesn't collapse into a single point:

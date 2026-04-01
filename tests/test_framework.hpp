@@ -1,8 +1,5 @@
 #pragma once
 
-// Minimal test framework — zero dependencies, header-only.
-// Supports: TEST(), ASSERT_TRUE, ASSERT_NEAR, ASSERT_EQ, ASSERT_LT, ASSERT_GT, ASSERT_THROW
-
 #include <cmath>
 #include <cstddef>
 #include <functional>

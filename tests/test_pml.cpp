@@ -1,6 +1,6 @@
 #include "test_framework.hpp"
 #include "../src/Classes/Config/config.hpp"
-#include "../src/Classes/PML/PML.hpp"
+#include "../src/Classes/PML/pml.hpp"
 #include <cmath>
 
 // ============================================================================

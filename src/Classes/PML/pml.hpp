@@ -74,17 +74,26 @@ public:
     void update_H_psi(
         double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
         double* RESTRICT Hx, double* RESTRICT Hy, double* RESTRICT Hz,
-        double const dt, double const dx, double const dy, double const dz
+        double const* RESTRICT Db_x, double const* RESTRICT Db_y, double const* RESTRICT Db_z,
+        double const dx, double const dy, double const dz
     );
 
     void update_E_psi(
         double* RESTRICT Ex, double* RESTRICT Ey, double* RESTRICT Ez,
         double* RESTRICT Hx, double* RESTRICT Hy, double* RESTRICT Hz,
-        double const dt, double const dx, double const dy, double const dz
+        double const* RESTRICT Cb_x, double const* RESTRICT Cb_y, double const* RESTRICT Cb_z,
+        double const dx, double const dy, double const dz
     );
 
     [[nodiscard]] std::size_t thickness() const { return thickness_; }
     [[nodiscard]] bool is_active() const { return thickness_ > 0; }
+
+    [[nodiscard]] std::size_t Nx() const { return Nx_; }
+    [[nodiscard]] std::size_t Ny() const { return Ny_; }
+    [[nodiscard]] std::size_t Nz() const { return Nz_; }
+    
+    [[nodiscard]] std::size_t Nx_padded() const { return Nx_padded_; }
+    [[nodiscard]] std::size_t Ny_padded() const { return Ny_padded_; }
 
     // Per-layer PML coefficients (length = thickness):
     [[nodiscard]] double* b_Ex_ptr() { return coeffs_[B_EX_]; }
@@ -154,7 +163,9 @@ public:
     [[nodiscard]] std::size_t psi_face_z() const { return psi_face_z_; }
 
     [[nodiscard]] std::size_t idx(
-        std::size_t const x, std::size_t const y, std::size_t const z
+        std::size_t const x,
+        std::size_t const y,
+        std::size_t const z
     ) const {
         return x + Nx_padded_ * ( y + Ny_padded_ * z );
     }

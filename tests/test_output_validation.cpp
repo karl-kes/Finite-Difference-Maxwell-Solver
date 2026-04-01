@@ -319,3 +319,59 @@ TEST(Integration, CPMLReflectionAllAxes) {
     ASSERT_LT( std::abs( R[0] - R[1] ), 5.0 );
     ASSERT_LT( std::abs( R[0] - R[2] ), 5.0 );
 }
+
+TEST(Integration, CPMLWorksWithNonUnityMaterials) {
+    // The PML ψ corrections must use Cb/Db (material-dependent) not bare dt.
+    // With the correct formulation, all material combinations give < -25 dB.
+    auto measure = []( double eps_val, double mu_val ) -> double {
+        Simulation_Config cfg{};
+        cfg.Nx = 60; cfg.Ny = 60; cfg.Nz = 60;
+        cfg.eps = eps_val; cfg.mu = mu_val;
+        cfg.compute_derived();
+        Grid grid{ cfg };
+        double const c{ 1.0 / std::sqrt( cfg.mu * cfg.eps ) };
+        double const eta{ std::sqrt( cfg.mu / cfg.eps ) };
+        double const wavelength{ 15.0 * cfg.dx };
+        double const k{ 2.0 * std::numbers::pi / wavelength };
+        std::size_t const pml_t{ cfg.pml_thickness };
+        std::size_t const wave_start{ pml_t + 5 };
+        std::size_t const wave_end{ grid.Nx() - pml_t - 1 };
+        std::size_t const taper{ std::min( std::size_t{10}, (wave_end-wave_start)/4 ) };
+        std::size_t const probe_pos{ pml_t + 2 };
+
+        for ( std::size_t z = 1; z < grid.Nz()-1; ++z )
+            for ( std::size_t y = 1; y < grid.Ny()-1; ++y )
+                for ( std::size_t x = 1; x < grid.Nx()-1; ++x ) {
+                    if ( x < wave_start || x >= wave_end ) continue;
+                    double envelope{ 1.0 };
+                    if ( x < wave_start + taper ) {
+                        double t = static_cast<double>(x-wave_start)/static_cast<double>(taper);
+                        envelope = 0.5*(1.0-std::cos(std::numbers::pi*t));
+                    } else if ( x >= wave_end - taper ) {
+                        double t = static_cast<double>(wave_end-1-x)/static_cast<double>(taper);
+                        envelope = 0.5*(1.0-std::cos(std::numbers::pi*t));
+                    }
+                    double phase = k * static_cast<double>(x) * cfg.dx;
+                    std::size_t i = grid.idx(x,y,z);
+                    grid.Ey_ptr()[i] = envelope * std::sin(phase);
+                    grid.Hz_ptr()[i] = envelope * std::sin(phase) / eta;
+                }
+
+        double dist = static_cast<double>(wave_end-wave_start+wave_start-probe_pos)*cfg.dx;
+        std::size_t steps = static_cast<std::size_t>(std::ceil(1.5*dist/(c*cfg.dt)));
+        for ( std::size_t t = 0; t < steps; ++t ) grid.step();
+
+        double peak{ 0 };
+        for ( std::size_t z = grid.Nz()/3; z < 2*grid.Nz()/3; ++z )
+            for ( std::size_t y = grid.Ny()/3; y < 2*grid.Ny()/3; ++y ) {
+                double val = std::abs(grid.Ey_ptr()[grid.idx(probe_pos,y,z)]);
+                if ( val > peak ) peak = val;
+            }
+        return 20.0 * std::log10( std::max(peak, 1e-30) );
+    };
+
+    ASSERT_LT( measure(4.0, 1.0), -25.0 );
+    ASSERT_LT( measure(1.0, 4.0), -25.0 );
+    ASSERT_LT( measure(9.0, 1.0), -25.0 );
+    ASSERT_LT( measure(2.0, 2.0), -25.0 );
+}
