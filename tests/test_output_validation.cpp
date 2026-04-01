@@ -17,8 +17,6 @@
 // ============================================================================
 
 TEST(Output, BinaryRoundTrip) {
-    // Write a known field state to binary, read it back using the same format
-    // as render.py, and verify the Yee-averaged values match.
     Simulation_Config cfg{};
     Grid grid{ cfg };
 
@@ -30,19 +28,16 @@ TEST(Output, BinaryRoundTrip) {
         }
     }
 
-    // Write:
     std::string test_dir{ "test_output_roundtrip" };
     Output output{ test_dir };
     output.initialize( grid );
     output.write_field( grid );
     output.finalize();
 
-    // Read back the E-field file:
     std::string path{ test_dir + "/E.bin" };
     std::ifstream file( path, std::ios::binary );
     ASSERT_TRUE( file.is_open() );
 
-    // Read header:
     uint64_t dims[3];
     file.read( reinterpret_cast<char*>(dims), sizeof(dims) );
     std::size_t nx = static_cast<std::size_t>(dims[0]);
@@ -53,7 +48,6 @@ TEST(Output, BinaryRoundTrip) {
     ASSERT_EQ( ny, grid.Ny() - 1 );
     ASSERT_EQ( nz, grid.Nz() - 1 );
 
-    // Read all data:
     std::size_t total_floats = nx * ny * nz * 3;
     std::vector<double> data( total_floats );
     file.read( reinterpret_cast<char*>(data.data()),
@@ -61,7 +55,6 @@ TEST(Output, BinaryRoundTrip) {
     ASSERT_TRUE( file.good() );
     file.close();
 
-    // Verify Yee-averaged Ey values at sample points.
     for ( std::size_t z = 10; z < 20; ++z ) {
         for ( std::size_t y = 10; y < 20; ++y ) {
             for ( std::size_t x = 10; x < 20; ++x ) {
@@ -79,16 +72,11 @@ TEST(Output, BinaryRoundTrip) {
         }
     }
 
-    // Also verify the H-field file was created:
-    std::string path_H{ test_dir + "/H.bin" };
-    ASSERT_TRUE( std::filesystem::exists( path_H ) );
-
-    // Cleanup:
+    ASSERT_TRUE( std::filesystem::exists( test_dir + "/H.bin" ) );
     std::filesystem::remove_all( test_dir );
 }
 
 TEST(Output, HeaderDimensionsConsistent) {
-    // The binary header should match the grid dimensions for both E and H files.
     Simulation_Config cfg{};
     Grid grid{ cfg };
 
@@ -126,27 +114,24 @@ TEST(Output, HeaderDimensionsConsistent) {
 }
 
 // ============================================================================
-// Validation Class Coverage
+// Validation Class
 // ============================================================================
-
-TEST(ValidationClass, PlaneWaveTestPasses) {
-    Simulation_Config cfg{};
-    Plane_Wave_Test test{ cfg };
-    Validation_Result result = test.run();
-
-    ASSERT_TRUE( result.passed );
-    ASSERT_LT( result.energy_drift_percent, 5.0 );
-    ASSERT_GT( result.phase_correlation, 0.97 );
-    ASSERT_LT( result.dispersion_percent, 10.0 );
-}
 
 TEST(ValidationClass, MetricsPhysicallyReasonable) {
     Simulation_Config cfg{};
     Plane_Wave_Test test{ cfg };
     Validation_Result result = test.run();
 
+    ASSERT_TRUE( result.passed );
+
+    // Energy drift present but small (actual ~3.8%):
     ASSERT_GT( result.energy_drift_percent, 0.0 );
+    ASSERT_LT( result.energy_drift_percent, 5.0 );
+
+    // Phase correlation very high (actual ~0.999998):
     ASSERT_GT( result.phase_correlation, 0.999 );
+
+    // Dispersion small (actual ~0.33%):
     ASSERT_GT( result.dispersion_percent, 0.0 );
     ASSERT_LT( result.dispersion_percent, 2.0 );
 }
@@ -238,4 +223,99 @@ TEST(Integration, CPMLReflectionCoefficient) {
     ASSERT_LT( R_dB, threshold_dB );
 
     ASSERT_GT( peak_reflected, 1e-20 );
+}
+
+// ============================================================================
+// Multi-Axis CPML Reflection
+// ============================================================================
+
+static double cpml_reflection_on_axis( int axis ) {
+    // Launch a tapered plane wave along the given axis (0=x, 1=y, 2=z),
+    // wait for the round-trip to a probe behind the wave start, and
+    // measure the peak reflected amplitude in dB.
+    Simulation_Config cfg{};
+    cfg.Nx = 60; cfg.Ny = 60; cfg.Nz = 60;
+    cfg.compute_derived();
+    Grid grid{ cfg };
+
+    std::size_t const pml_t{ cfg.pml_thickness };
+    std::size_t const n[3]{ grid.Nx(), grid.Ny(), grid.Nz() };
+    double const d[3]{ cfg.dx, cfg.dy, cfg.dz };
+    double const c{ 1.0 / std::sqrt( cfg.mu * cfg.eps ) };
+    double const eta{ std::sqrt( cfg.mu / cfg.eps ) };
+
+    double const wavelength{ 15.0 * d[axis] };
+    double const k{ 2.0 * std::numbers::pi / wavelength };
+
+    std::size_t const wave_start{ pml_t + 5 };
+    std::size_t const wave_end{ n[axis] - pml_t - 1 };
+    std::size_t const taper{ std::min( std::size_t{10}, ( wave_end - wave_start ) / 4 ) };
+    std::size_t const probe_pos{ pml_t + 2 };
+
+    for ( std::size_t z = 1; z < n[2] - 1; ++z )
+        for ( std::size_t y = 1; y < n[1] - 1; ++y )
+            for ( std::size_t x = 1; x < n[0] - 1; ++x ) {
+                std::size_t const coords[3]{ x, y, z };
+                std::size_t const ap{ coords[axis] };
+                if ( ap < wave_start || ap >= wave_end ) continue;
+
+                double envelope{ 1.0 };
+                if ( ap < wave_start + taper ) {
+                    double t = static_cast<double>( ap - wave_start ) / static_cast<double>( taper );
+                    envelope = 0.5 * ( 1.0 - std::cos( std::numbers::pi * t ) );
+                } else if ( ap >= wave_end - taper ) {
+                    double t = static_cast<double>( wave_end - 1 - ap ) / static_cast<double>( taper );
+                    envelope = 0.5 * ( 1.0 - std::cos( std::numbers::pi * t ) );
+                }
+
+                double const phase{ k * static_cast<double>( ap ) * d[axis] };
+                std::size_t const i{ grid.idx( x, y, z ) };
+                double const val{ envelope * std::sin( phase ) };
+
+                // Plane wave polarization: axis 0→(Ey,Hz), 1→(Ez,Hx), 2→(Ex,Hy)
+                if ( axis == 0 ) { grid.Ey_ptr()[i] = val; grid.Hz_ptr()[i] = val / eta; }
+                else if ( axis == 1 ) { grid.Ez_ptr()[i] = val; grid.Hx_ptr()[i] = val / eta; }
+                else { grid.Ex_ptr()[i] = val; grid.Hy_ptr()[i] = val / eta; }
+            }
+
+    double const dist_fwd{ static_cast<double>( wave_end - wave_start ) * d[axis] };
+    double const dist_ret{ static_cast<double>( wave_start - probe_pos ) * d[axis] };
+    std::size_t const steps{ static_cast<std::size_t>(
+        std::ceil( 1.5 * ( dist_fwd + dist_ret ) / ( c * cfg.dt ) ) ) };
+
+    for ( std::size_t t = 0; t < steps; ++t ) grid.step();
+
+    double peak{ 0 };
+    for ( std::size_t a = n[axis] / 3; a < 2 * n[axis] / 3; ++a )
+        for ( std::size_t b = n[axis] / 3; b < 2 * n[axis] / 3; ++b ) {
+            std::size_t x, y, z;
+            if ( axis == 0 ) { x = probe_pos; y = a; z = b; }
+            else if ( axis == 1 ) { x = a; y = probe_pos; z = b; }
+            else { x = a; y = b; z = probe_pos; }
+
+            double val;
+            if ( axis == 0 ) val = std::abs( grid.Ey_ptr()[ grid.idx(x,y,z) ] );
+            else if ( axis == 1 ) val = std::abs( grid.Ez_ptr()[ grid.idx(x,y,z) ] );
+            else val = std::abs( grid.Ex_ptr()[ grid.idx(x,y,z) ] );
+            if ( val > peak ) peak = val;
+        }
+
+    return 20.0 * std::log10( std::max( peak, 1e-30 ) );
+}
+
+TEST(Integration, CPMLReflectionAllAxes) {
+    // The CPML has independently coded face loops for x, y, and z with
+    // different ψ indexing. A sign or index error in one axis would cause
+    // that face to amplify instead of absorb. Test all three.
+    // Measured: all axes give -36 to -37 dB on a 60^3 isotropic grid.
+    double R[3];
+    for ( int axis = 0; axis < 3; ++axis ) {
+        R[axis] = cpml_reflection_on_axis( axis );
+        ASSERT_LT( R[axis], -30.0 );
+        ASSERT_GT( R[axis], -80.0 );  // sanity: signal should exist
+    }
+
+    // All axes should agree within 5 dB (isotropic grid):
+    ASSERT_LT( std::abs( R[0] - R[1] ), 5.0 );
+    ASSERT_LT( std::abs( R[0] - R[2] ), 5.0 );
 }

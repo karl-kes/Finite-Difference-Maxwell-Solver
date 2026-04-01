@@ -56,9 +56,7 @@ where α (0 < α ≤ 1.0) is a configurable CFL factor for stability margin.
 - **Binary I/O with double-buffered writes** — persistent writer thread with condition-variable synchronization for overlap of computation and disk I/O
 - **Rerun 3D visualization** with Points3D volume rendering and Arrows3D vector cones, separate viridis (E-field) and inferno (H-field) colormaps, and time-series energy plots
 - **External configuration file** (`config.cfg`) with runtime-parsed key-value pairs; unknown keys are warned, missing keys fall back to compiled defaults
-- **Comprehensive test suite** (42 test cases) across 7 suites: AlignedSoA, Grid, Source, PML, Integration, Output, and Validation — integrated with CTest
-- **Three-tier CMake build system**: Debug (sanitizers + tests), Test (optimized + tests), Release (optimized, no tests)
-- **Cross-platform**: Linux, macOS, Windows (MinGW/MSYS2); sanitizers enabled on Linux/macOS only
+- **Comprehensive test suite** Across 7 suites: AlignedSoA, Grid, Source, PML, Integration, Output, and Validation
 
 ## Quick Start
 
@@ -157,7 +155,7 @@ The correct CPML formulation keeps the standard unmodified curl in the main E/H 
 
 ## Memory Layout
 
-All field and material arrays (Ex, Ey, Ez, Hx, Hy, Hz, Jx, Jy, Jz, ε, μ, σ per component, plus precomputed Ca, Cb, Db coefficients — 27 arrays total) are stored in a single monolithic `AlignedSoA<double>` block. Each sub-array stride is rounded up to a SIMD-width boundary, ensuring every row starts at a naturally aligned address. SIMD width is detected at compile time (AVX-512 → 64 B, AVX2 → 32 B, SSE2 → 16 B, scalar → 8 B), avoiding the wasted cache bandwidth of a fixed 64-byte alignment on narrower hardware. Raw pointer access with `RESTRICT` qualification and `ASSUME_ALIGNED` hints gives the compiler full optimization freedom in the hot loops.
+All field and material arrays (E(x,y,z), H(x,y,z), J(x,y,z), ε(x,y,z), μ(x,y,z), σ(x,y,z), and precomputed Ca(x,y,z), Cb(x,y,z), Db(x,y,z) coefficients) are stored in a single monolithic `AlignedSoA<double>` block. Each sub-array stride is rounded up to a SIMD-width boundary, ensuring every row starts at a naturally aligned address. SIMD width is detected at compile time (AVX-512 → 64 B, AVX2 → 32 B, SSE2 → 16 B, scalar → 8 B), avoiding the wasted cache bandwidth of a fixed 64-byte alignment on narrower hardware. Raw pointer access with `RESTRICT` qualification and `ASSUME_ALIGNED` hints gives the compiler full optimization freedom in the hot loops.
 
 ## Validation
 

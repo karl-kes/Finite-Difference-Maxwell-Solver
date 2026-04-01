@@ -46,8 +46,6 @@ private:
     PML pml_;
 
     // Private Methods:
-    void update_H();
-    void update_E();
     [[nodiscard]] PML const &pml() const { return pml_; }
 
     
@@ -175,6 +173,10 @@ public:
     [[nodiscard]] double const* Db_z_ptr() const { return data_[DB_Z_]; }
 
     // Diagnostics:
+    void update_H();
+    void update_E();
+    void bake_coefficients();
+
     [[nodiscard]] double h_energy() const;
     [[nodiscard]] double e_energy() const;
     [[nodiscard]] double total_energy() const;

@@ -7,23 +7,13 @@
 // ============================================================================
 
 TEST(AlignedSoA, RoundUpMultipleOfSimdWidth) {
-    // round_up should return the next multiple of elements_per_alignment
     constexpr std::size_t elems_per_align = SIMD_BYTES / sizeof(double);
 
-    // Exact multiple should stay the same:
     ASSERT_EQ( AlignedSoA<double>::round_up( elems_per_align ), elems_per_align );
     ASSERT_EQ( AlignedSoA<double>::round_up( 2 * elems_per_align ), 2 * elems_per_align );
-
-    // One over should round up:
     ASSERT_EQ( AlignedSoA<double>::round_up( elems_per_align + 1 ), 2 * elems_per_align );
-
-    // One under should round up:
     ASSERT_EQ( AlignedSoA<double>::round_up( elems_per_align - 1 ), elems_per_align );
-
-    // Zero stays zero:
     ASSERT_EQ( AlignedSoA<double>::round_up( 0 ), std::size_t{0} );
-
-    // 1 rounds up:
     ASSERT_EQ( AlignedSoA<double>::round_up( 1 ), elems_per_align );
 }
 
@@ -37,11 +27,10 @@ TEST(AlignedSoA, AllocationZeroInitialized) {
 }
 
 TEST(AlignedSoA, StrideIsAligned) {
-    AlignedSoA<double> soa{ 101, 3 };  // 101 is not aligned
+    AlignedSoA<double> soa{ 101, 3 };
     std::size_t stride = soa.stride();
     constexpr std::size_t elems_per_align = SIMD_BYTES / sizeof(double);
 
-    // Stride must be a multiple of elems_per_align:
     ASSERT_EQ( stride % elems_per_align, std::size_t{0} );
     ASSERT_TRUE( stride >= 101 );
 }
@@ -58,7 +47,6 @@ TEST(AlignedSoA, SubArraysNonOverlapping) {
     AlignedSoA<double> soa{ 200, 5 };
     for ( std::size_t a = 0; a < 5; ++a ) {
         for ( std::size_t b = a + 1; b < 5; ++b ) {
-            // Write distinct values and check no corruption:
             double* pa = soa[a];
             double* pb = soa[b];
             pa[0] = 1.0 + static_cast<double>(a);
@@ -74,12 +62,10 @@ TEST(AlignedSoA, MoveSemantics) {
     soa[0][0] = 42.0;
     soa[1][0] = 99.0;
 
-    // Move construct:
     AlignedSoA<double> moved{ std::move(soa) };
     ASSERT_NEAR( moved[0][0], 42.0, 1e-15 );
     ASSERT_NEAR( moved[1][0], 99.0, 1e-15 );
 
-    // Move assign:
     AlignedSoA<double> assigned;
     assigned = std::move(moved);
     ASSERT_NEAR( assigned[0][0], 42.0, 1e-15 );

@@ -47,7 +47,9 @@ public:
     // Derived (computed from above):
     double dt{};
     std::size_t pml_thickness{};
-    double pml_sigma_max{};
+    double pml_sigma_max_x{};
+    double pml_sigma_max_y{};
+    double pml_sigma_max_z{};
 
     // Default constructor uses hardcoded defaults:
     Simulation_Config() { compute_derived(); }
@@ -94,11 +96,12 @@ public:
     }
 
     [[nodiscard]] std::size_t output_interval() const {
-        return total_steps / 1000;
+        return 1;
     }
 
     void compute_derived() {
         double const c{ 1.0 / std::sqrt( mu * eps ) };
+        double const eta{ std::sqrt( mu / eps ) };
         std::size_t const size{ Nx * Ny * Nz };
 
         dt = cfl_factor / ( c * std::sqrt( 1.0 / ( dx * dx ) + 
@@ -106,10 +109,19 @@ public:
                                            1.0 / ( dz * dz )
                                          ) 
                           );
-        pml_thickness = static_cast<std::size_t>( std::cbrt(
-                            static_cast<double>( size ) ) / 6.0 );
-        pml_sigma_max = 0.8 * ( pml_order + 1 )
-                      / ( dx * std::sqrt( mu / eps ) );
+
+        // PML thickness: heuristic from grid volume, clamped to [4, 25]:
+        std::size_t raw_thickness{ static_cast<std::size_t>(
+            std::cbrt( static_cast<double>( size ) ) / 6.0 
+        ) };
+        pml_thickness = std::max( std::size_t{4},
+                        std::min( raw_thickness, std::size_t{25} ) );
+
+        // Per-axis optimal sigma_max (Berenger formula):
+        double const coeff{ 0.8 * ( pml_order + 1 ) };
+        pml_sigma_max_x = coeff / ( dx * eta );
+        pml_sigma_max_y = coeff / ( dy * eta );
+        pml_sigma_max_z = coeff / ( dz * eta );
     }
 
 private:

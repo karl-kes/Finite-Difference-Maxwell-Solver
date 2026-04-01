@@ -15,6 +15,7 @@ public:
 
     explicit Simulation( Simulation_Config const &new_config );
 
+    void initialize_sources();
     void initialize();
     void run();
 };

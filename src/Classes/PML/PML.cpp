@@ -11,7 +11,9 @@ PML::PML( Simulation_Config const &config )
 , Nx_padded_{ AlignedSoA<double>::round_up( Nx_ ) }
 , Ny_padded_{ AlignedSoA<double>::round_up( Ny_ ) }
 , order_{ config.pml_order }
-, sigma_max_{ config.pml_sigma_max }
+, sigma_max_x_{ config.pml_sigma_max_x }
+, sigma_max_y_{ config.pml_sigma_max_y }
+, sigma_max_z_{ config.pml_sigma_max_z }
 , kappa_max_{ config.pml_kappa_max }
 , alpha_max_{ config.pml_alpha_max }
 , coeffs_{}
@@ -37,28 +39,29 @@ PML::PML( Simulation_Config const &config )
 
     for ( std::size_t i{ 0 }; i < thickness_; ++i ) {
         double const depth_E{ ( d - static_cast<double>( i ) ) / d };
-        double const sig_E{ sigma( depth_E ) };
         double const kap_E{ kappa( depth_E ) };
         double const alp_E{ alpha( depth_E ) };
 
         double const depth_H{ ( d - ( static_cast<double>( i ) + 0.5 ) ) / d };
         double const depth_H_clamped{ std::max( depth_H, 0.0 ) };
-        double const sig_H{ sigma( depth_H_clamped ) };
         double const kap_H{ kappa( depth_H_clamped ) };
         double const alp_H{ alpha( depth_H_clamped ) };
 
-        compute_coefficients( sig_E, kap_E, alp_E, config.dt, config.eps, b_Ex[i], c_Ex[i] );
-        compute_coefficients( sig_H, kap_H, alp_H, config.dt, config.eps, b_Hx[i], c_Hx[i] );
+        // x-axis coefficients:
+        compute_coefficients( sigma_x(depth_E), kap_E, alp_E, config.dt, config.eps, b_Ex[i], c_Ex[i] );
+        compute_coefficients( sigma_x(depth_H_clamped), kap_H, alp_H, config.dt, config.eps, b_Hx[i], c_Hx[i] );
         kappa_Ex[i] = kap_E;
         kappa_Hx[i] = kap_H;
 
-        compute_coefficients( sig_E, kap_E, alp_E, config.dt, config.eps, b_Ey[i], c_Ey[i] );
-        compute_coefficients( sig_H, kap_H, alp_H, config.dt, config.eps, b_Hy[i], c_Hy[i] );
+        // y-axis coefficients:
+        compute_coefficients( sigma_y(depth_E), kap_E, alp_E, config.dt, config.eps, b_Ey[i], c_Ey[i] );
+        compute_coefficients( sigma_y(depth_H_clamped), kap_H, alp_H, config.dt, config.eps, b_Hy[i], c_Hy[i] );
         kappa_Ey[i] = kap_E;
         kappa_Hy[i] = kap_H;
 
-        compute_coefficients( sig_E, kap_E, alp_E, config.dt, config.eps, b_Ez[i], c_Ez[i] );
-        compute_coefficients( sig_H, kap_H, alp_H, config.dt, config.eps, b_Hz[i], c_Hz[i] );
+        // z-axis coefficients:
+        compute_coefficients( sigma_z(depth_E), kap_E, alp_E, config.dt, config.eps, b_Ez[i], c_Ez[i] );
+        compute_coefficients( sigma_z(depth_H_clamped), kap_H, alp_H, config.dt, config.eps, b_Hz[i], c_Hz[i] );
         kappa_Ez[i] = kap_E;
         kappa_Hz[i] = kap_H;
     }

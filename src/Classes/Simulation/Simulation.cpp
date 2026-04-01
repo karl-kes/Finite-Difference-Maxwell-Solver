@@ -18,34 +18,72 @@ void Simulation::print_progress( std::size_t const current, std::size_t const to
     std::cout << "\rProgress: " << percent << "%" << std::flush;
 }
 
-void Simulation::initialize() {
-    // Begin Outputs:
-    output_.initialize( grid_ );
-
+void Simulation::initialize_sources() {
+    // Constants:
+    double const initial_time{ 0 };
     double const c{ 1.0 / std::sqrt( config_.eps * config_.mu ) };
-    double const freq{ c / ( grid_.Nx()/2 * std::sqrt( grid_.dx() )) };
-    std::size_t const z{ grid_.Nz()/2 };
+    double const cells_per_wavelength{ static_cast<double>( grid_.Nx() ) / 2.0 };
+    double const freq{ c / ( cells_per_wavelength * grid_.dx() ) };
+    double const amp{ 1.0 };
+
+    // Grid points:
+    std::size_t const half_z{ grid_.Nz() / 2 };
+    std::size_t const half_y{ grid_.Ny() / 2 };
+    std::size_t const half_x{ grid_.Nx() / 2 };
+
+    std::size_t const start_x{ 0 };
+    std::size_t const end_x{ grid_.Nx() };
 
     // AC current wire loop:
     grid_.add_source( std::make_unique<AC_Current_Loop>(
-        1.0,                     // amplitude
-        freq,                    // frequency
-        z                        // z-plane level
+        amp,
+        freq,
+        half_z
     ) );
 
-    // AC current straight wire:
-//     grid_.add_source( std::make_unique<Straight_Wire_X>(
-//         1.0,
-//         freq,
-//         grid_.Ny()/2,
-//         grid_.Nz()/2,
-//         0,
-//         grid_.Nx()
-//     ) );
+    // // AC current concentric rings:
+    // grid_.add_source( std::make_unique<AC_Concentric_Rings>(
+    //     amp,
+    //     freq,
+    //     half_z
+    // ) );
+
+    // // AC current wire along x:
+    // grid_.add_source( std::make_unique<Straight_Wire_X>(
+    //     amp,
+    //     freq,
+    //     half_y,
+    //     half_z,
+    //     start_x,
+    //     end_x
+    // ) );
+
+    // // Point source:
+    // grid_.add_source( std::make_unique<Point_Source>(
+    //     amp,
+    //     half_x,
+    //     half_y,
+    //     half_z
+    // ) );
+
+    // // Gaussian pulse:
+    // grid_.add_source( std::make_unique<Gaussian_Pulse>(
+    //     amp,
+    //     initial_time,
+    //     freq,
+    //     half_x,
+    //     half_y,
+    //     half_z
+    // ) );
+}
+
+void Simulation::initialize() {
+    output_.initialize( grid_ );
+    initialize_sources();
 }
 
 void Simulation::run() {
-    std::cout << "<-----Maxwell Simulation----->" << std::endl;
+    std::cout << "<---- Maxwell Simulation ---->" << std::endl;
 
     // Run simulation and start timer:
     std::size_t const output_interval{ config_.output_interval() };

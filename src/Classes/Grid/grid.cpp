@@ -34,7 +34,15 @@ Grid::Grid( Simulation_Config const &config )
 
     // sig arrays are already zero from AlignedSoA zero-init.
 
-    // Bake hot-loop coeffs:
+    // Adjust coefficients:
+    bake_coefficients();
+}
+
+Grid::~Grid() = default;
+
+void Grid::bake_coefficients() {
+    std::size_t const total{ Nx_padded_ * Ny_padded_ * Nz_padded_ };
+
     #pragma omp simd
     for ( std::size_t i = 0; i < total; ++i ) {
         // Losses in all components:
@@ -62,8 +70,6 @@ Grid::Grid( Simulation_Config const &config )
         Db_z_ptr()[i] = dt_ / mu_z_ptr()[i];
     }
 }
-
-Grid::~Grid() = default;
 
 void Grid::add_source( std::unique_ptr<Source> source ) {
     sources_.push_back( std::move( source ) );
@@ -100,37 +106,40 @@ void Grid::update_H() {
     ASSUME_ALIGNED(Db_y, SIMD_BYTES);
     ASSUME_ALIGNED(Db_z, SIMD_BYTES);
 
-    double const inv_dx{ 1.0 / dx_ };
-    double const inv_dy{ 1.0 / dy_ };
-    double const inv_dz{ 1.0 / dz_ };
+    double const inv_dx{ 1.0 / dx() };
+    double const inv_dy{ 1.0 / dy() };
+    double const inv_dz{ 1.0 / dz() };
 
-    std::size_t const nx{ Nx_ };
-    std::size_t const ny{ Ny_ };
-    std::size_t const nz{ Nz_ };
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
 
-    std::size_t const Sy{ Nx_padded_ };
-    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
-    for ( std::size_t z = 0; z < nz - 1; ++z ) {
-        for ( std::size_t y = 0; y < ny - 1; ++y ) {
+    for ( std::size_t z = 0; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 0; y < Ny_local - 1; ++y ) {
             std::size_t const base{ y * Sy + z * Sz };
 
             #pragma omp simd
-            for ( std::size_t x = 0; x < nx - 1; ++x ) {
+            for ( std::size_t x = 0; x < Nx_local - 1; ++x ) {
                 std::size_t const i{ base + x };
+                std::size_t const i_x{ i + 1 };
+                std::size_t const i_y{ i + Sy };
+                std::size_t const i_z{ i + Sz };
 
                 double const curl_x{
-                    ( Ez[i + Sy] - Ez[i] ) * inv_dy
-                  - ( Ey[i + Sz] - Ey[i] ) * inv_dz
+                    ( Ez[i_y] - Ez[i] ) * inv_dy
+                  - ( Ey[i_z] - Ey[i] ) * inv_dz
                 };
                 double const curl_y{
-                    ( Ex[i + Sz] - Ex[i] ) * inv_dz
-                  - ( Ez[i + 1]  - Ez[i] ) * inv_dx
+                    ( Ex[i_z] - Ex[i] ) * inv_dz
+                  - ( Ez[i_x] - Ez[i] ) * inv_dx
                 };
                 double const curl_z{
-                    ( Ey[i + 1]  - Ey[i] ) * inv_dx
-                  - ( Ex[i + Sy] - Ex[i] ) * inv_dy
+                    ( Ey[i_x] - Ey[i] ) * inv_dx
+                  - ( Ex[i_y] - Ex[i] ) * inv_dy
                 };
 
                 Hx[i] -= Db_x[i] * curl_x;
@@ -143,7 +152,7 @@ void Grid::update_H() {
     pml_.update_H_psi(
         Ex_ptr(), Ey_ptr(), Ez_ptr(),
         Hx_ptr(), Hy_ptr(), Hz_ptr(),
-        dt_, dx_, dy_, dz_ 
+        dt(), dx(), dy(), dz() 
     );    
 }
 
@@ -188,37 +197,40 @@ void Grid::update_E() {
     ASSUME_ALIGNED(Cb_y, SIMD_BYTES);
     ASSUME_ALIGNED(Cb_z, SIMD_BYTES);
 
-    double const inv_dx{ 1.0 / dx_ };
-    double const inv_dy{ 1.0 / dy_ };
-    double const inv_dz{ 1.0 / dz_ };
+    double const inv_dx{ 1.0 / dx() };
+    double const inv_dy{ 1.0 / dy() };
+    double const inv_dz{ 1.0 / dz() };
 
-    std::size_t const nx{ Nx_ };
-    std::size_t const ny{ Ny_ };
-    std::size_t const nz{ Nz_ };
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
 
-    std::size_t const Sy{ Nx_padded_ };
-    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) schedule( static )
-    for ( std::size_t z = 1; z < nz - 1; ++z ) {
-        for ( std::size_t y = 1; y < ny - 1; ++y ) {
+    for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
             std::size_t const base{ y * Sy + z * Sz };
 
             #pragma omp simd
-            for ( std::size_t x = 1; x < nx - 1; ++x ) {
+            for ( std::size_t x = 1; x < Nx_local - 1; ++x ) {
                 std::size_t const i{ base + x };
+                std::size_t const i_x{ i - 1 };
+                std::size_t const i_y{ i - Sy };
+                std::size_t const i_z{ i - Sz };
 
                 double const curl_x{
-                    ( Hz[i] - Hz[i - Sy] ) * inv_dy
-                  - ( Hy[i] - Hy[i - Sz] ) * inv_dz
+                    ( Hz[i] - Hz[i_y] ) * inv_dy
+                  - ( Hy[i] - Hy[i_z] ) * inv_dz
                 };
                 double const curl_y{
-                    ( Hx[i] - Hx[i - Sz] ) * inv_dz
-                  - ( Hz[i] - Hz[i - 1]  ) * inv_dx
+                    ( Hx[i] - Hx[i_z] ) * inv_dz
+                  - ( Hz[i] - Hz[i_x] ) * inv_dx
                 };
                 double const curl_z{
-                    ( Hy[i] - Hy[i - 1]  ) * inv_dx
-                  - ( Hx[i] - Hx[i - Sy] ) * inv_dy
+                    ( Hy[i] - Hy[i_x] ) * inv_dx
+                  - ( Hx[i] - Hx[i_y] ) * inv_dy
                 };
 
                 Ex[i] = Ca_x[i] * Ex[i] + Cb_x[i] * ( curl_x - Jx[i] );

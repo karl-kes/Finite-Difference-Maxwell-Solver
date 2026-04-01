@@ -34,7 +34,9 @@ private:
     std::size_t Nx_padded_, Ny_padded_;
     
     int order_;
-    double sigma_max_;
+    double sigma_max_x_;
+    double sigma_max_y_;
+    double sigma_max_z_;
     double kappa_max_;
     double alpha_max_;
 
@@ -45,7 +47,9 @@ private:
     std::size_t psi_face_y_;
     std::size_t psi_face_z_;
 
-    [[nodiscard]] double sigma( double const depth_norm ) const { return sigma_max_ * std::pow( depth_norm, order_ ); }
+    [[nodiscard]] double sigma_x( double const depth_norm ) const { return sigma_max_x_ * std::pow( depth_norm, order_ ); }
+    [[nodiscard]] double sigma_y( double const depth_norm ) const { return sigma_max_y_ * std::pow( depth_norm, order_ ); }
+    [[nodiscard]] double sigma_z( double const depth_norm ) const { return sigma_max_z_ * std::pow( depth_norm, order_ ); }
     [[nodiscard]] double kappa( double const depth_norm ) const { return 1.0 + ( kappa_max_ - 1.0 ) * std::pow( depth_norm, order_ ); }
     [[nodiscard]] double alpha( double const depth_norm ) const { return alpha_max_ * ( 1.0 - depth_norm ); }
 

@@ -59,6 +59,27 @@ public:
 
 };
 
+class AC_Concentric_Rings : public Source {
+private:
+    double amplitude_;
+    double frequency_;
+    std::size_t z_;
+
+public:
+    AC_Concentric_Rings(
+        double amp,
+        double freq,
+        std::size_t z
+    )
+    : amplitude_{ amp }
+    , frequency_{ freq }
+    , z_{ z }
+    { }
+
+    void apply( Grid &grid, std::size_t const time_step ) override;
+
+};
+
 // Hard source injection at single point:
 class Point_Source : public Source { 
 private:
