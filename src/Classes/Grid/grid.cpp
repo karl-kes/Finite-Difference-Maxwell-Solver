@@ -41,23 +41,23 @@ Grid::Grid( Simulation_Config const &config )
 Grid::~Grid() = default;
 
 void Grid::bake_coefficients() {
-    std::size_t const total{ Nx_padded_ * Ny_padded_ * Nz_padded_ };
+    std::size_t const total{ Nx_padded() * Ny_padded() * Nz_padded() };
 
     #pragma omp simd
     for ( std::size_t i = 0; i < total; ++i ) {
         // Losses in all components:
-        double const loss_x{ sig_x_ptr()[i] * dt_ / ( 2.0 * eps_x_ptr()[i] ) };
-        double const loss_y{ sig_y_ptr()[i] * dt_ / ( 2.0 * eps_y_ptr()[i] ) };
-        double const loss_z{ sig_z_ptr()[i] * dt_ / ( 2.0 * eps_z_ptr()[i] ) };
+        double const loss_x{ sig_x_ptr()[i] * dt() / ( 2.0 * eps_x_ptr()[i] ) };
+        double const loss_y{ sig_y_ptr()[i] * dt() / ( 2.0 * eps_y_ptr()[i] ) };
+        double const loss_z{ sig_z_ptr()[i] * dt() / ( 2.0 * eps_z_ptr()[i] ) };
 
         // C_a constant:
         Ca_x_ptr()[i] = ( 1.0 - loss_x ) / ( 1.0 + loss_x );
         Ca_y_ptr()[i] = ( 1.0 - loss_y ) / ( 1.0 + loss_y );
         Ca_z_ptr()[i] = ( 1.0 - loss_z ) / ( 1.0 + loss_z );
 
-        double const denom_x{ eps_x_ptr()[i] / dt_ + sig_x_ptr()[i] / 2.0 };
-        double const denom_y{ eps_y_ptr()[i] / dt_ + sig_y_ptr()[i] / 2.0 };
-        double const denom_z{ eps_z_ptr()[i] / dt_ + sig_z_ptr()[i] / 2.0 };
+        double const denom_x{ eps_x_ptr()[i] / dt() + sig_x_ptr()[i] / 2.0 };
+        double const denom_y{ eps_y_ptr()[i] / dt() + sig_y_ptr()[i] / 2.0 };
+        double const denom_z{ eps_z_ptr()[i] / dt() + sig_z_ptr()[i] / 2.0 };
         
         // C_b constant:
         Cb_x_ptr()[i] = 1.0 / denom_x;
@@ -65,9 +65,9 @@ void Grid::bake_coefficients() {
         Cb_z_ptr()[i] = 1.0 / denom_z;
 
         // D_b constant:
-        Db_x_ptr()[i] = dt_ / mu_x_ptr()[i];
-        Db_y_ptr()[i] = dt_ / mu_y_ptr()[i];
-        Db_z_ptr()[i] = dt_ / mu_z_ptr()[i];
+        Db_x_ptr()[i] = dt() / mu_x_ptr()[i];
+        Db_y_ptr()[i] = dt() / mu_y_ptr()[i];
+        Db_z_ptr()[i] = dt() / mu_z_ptr()[i];
     }
 }
 
@@ -243,7 +243,7 @@ void Grid::update_E() {
     pml_.update_E_psi(
         Ex_ptr(), Ey_ptr(), Ez_ptr(),
         Hx_ptr(), Hy_ptr(), Hz_ptr(),
-        dt_, dx_, dy_, dz_
+        dt(), dx(), dy(), dz()
     );
 }
 
@@ -256,6 +256,7 @@ double Grid::field(
     Field const field, Component const component,
     std::size_t const x, std::size_t const y, std::size_t const z ) const {
     std::size_t const i{ idx(x,y,z) };
+
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
             case Component::X: return Ex_ptr()[i];
@@ -276,6 +277,7 @@ double &Grid::field(
     Field const field, Component const component,
     std::size_t const x, std::size_t const y, std::size_t const z ) {
     std::size_t const i{ idx(x,y,z) };
+
     if ( field == Field::ELECTRIC ) {
         switch ( component ) {
             case Component::X: return Ex_ptr()[i];
@@ -304,7 +306,7 @@ double Grid::field_magnitude(
 
 double Grid::e_energy() const {
     double energy{};
-    double const dV{ dx_ * dy_ * dz_ };
+    double const dV{ dx() * dy() * dz() };
 
     double const* RESTRICT Ex{ Ex_ptr() };
     double const* RESTRICT Ey{ Ey_ptr() };
@@ -314,20 +316,27 @@ double Grid::e_energy() const {
     double const* RESTRICT eps_y{ eps_y_ptr() };
     double const* RESTRICT eps_z{ eps_z_ptr() };
 
-    std::size_t const Sy{ Nx_padded_ };
-    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
+
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) reduction( +:energy )
-    for ( std::size_t z = 1; z < Nz_ - 1; ++z ) {
-        for ( std::size_t y = 1; y < Ny_ - 1; ++y ) {
+    for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
             std::size_t const base{ y * Sy + z * Sz };
 
-            for ( std::size_t x = 1; x < Nx_ - 1; ++x ) {
+            for ( std::size_t x = 1; x < Nx_local - 1; ++x ) {
                 std::size_t const i{ base + x };
+                std::size_t const i_x{ i + 1 };
+                std::size_t const i_y{ i + Sy };
+                std::size_t const i_z{ i + Sz };
 
-                double const Ex_avg{ ( Ex[i] + Ex[i+1] ) * 0.5 };
-                double const Ey_avg{ ( Ey[i] + Ey[i+Sy] ) * 0.5 };
-                double const Ez_avg{ ( Ez[i] + Ez[i+Sz] ) * 0.5 };
+                double const Ex_avg{ ( Ex[i] + Ex[i_x] ) * 0.5 };
+                double const Ey_avg{ ( Ey[i] + Ey[i_y] ) * 0.5 };
+                double const Ez_avg{ ( Ez[i] + Ez[i_z] ) * 0.5 };
 
                 energy += eps_x[i] * Ex_avg * Ex_avg
                         + eps_y[i] * Ey_avg * Ey_avg
@@ -350,20 +359,31 @@ double Grid::h_energy() const {
     double const* RESTRICT mu_y{ mu_y_ptr() };
     double const* RESTRICT mu_z{ mu_z_ptr() };
 
-    std::size_t const Sy{ Nx_padded_ };
-    std::size_t const Sz{ Nx_padded_ * Ny_padded_ };
+    std::size_t const Nx_local{ Nx() };
+    std::size_t const Ny_local{ Ny() };
+    std::size_t const Nz_local{ Nz() };
+
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     #pragma omp parallel for collapse( 2 ) reduction( +:energy )
-    for ( std::size_t z = 1; z < Nz_ - 1; ++z ) {
-        for ( std::size_t y = 1; y < Ny_ - 1; ++y ) {
+    for ( std::size_t z = 1; z < Nz_local - 1; ++z ) {
+        for ( std::size_t y = 1; y < Ny_local - 1; ++y ) {
             std::size_t const base{ y * Sy + z * Sz };
 
-            for ( std::size_t x = 1; x < Nx_ - 1; ++x ) {
+            for ( std::size_t x = 1; x < Nx_local - 1; ++x ) {
                 std::size_t const i{ base + x };
+                std::size_t const i_x{ i + 1 };
+                std::size_t const i_y{ i + Sy };
+                std::size_t const i_z{ i + Sz };
 
-                double const Hx_avg{ ( Hx[i] + Hx[i+Sy] + Hx[i+Sz] + Hx[i+Sy+Sz] ) * 0.25 };
-                double const Hy_avg{ ( Hy[i] + Hy[i+1]  + Hy[i+Sz] + Hy[i+1+Sz]  ) * 0.25 };
-                double const Hz_avg{ ( Hz[i] + Hz[i+1]  + Hz[i+Sy] + Hz[i+1+Sy]  ) * 0.25 };
+                std::size_t const i_x_y{ i_x + Sy };
+                std::size_t const i_x_z{ i_x + Sz };
+                std::size_t const i_y_z{ i_y + Sz };
+
+                double const Hx_avg{ ( Hx[i] + Hx[i_y] + Hx[i_z] + Hx[i_y_z] ) * 0.25 };
+                double const Hy_avg{ ( Hy[i] + Hy[i_x] + Hy[i_z] + Hy[i_x_z] ) * 0.25 };
+                double const Hz_avg{ ( Hz[i] + Hz[i_x] + Hz[i_y] + Hz[i_x_y] ) * 0.25 };
 
                 energy += mu_x[i] * Hx_avg * Hx_avg
                         + mu_y[i] * Hy_avg * Hy_avg
