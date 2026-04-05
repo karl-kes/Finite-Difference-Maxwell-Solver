@@ -7,7 +7,7 @@ void Straight_Wire_X::apply( Grid &grid, std::size_t const time_step ) {
     double const omega{ 2.0 * std::numbers::pi * frequency_ };
     double const current{ amplitude_ * std::sin( omega * static_cast<double>( time_step ) * grid.dt() ) };
 
-    double* RESTRICT Jx{ grid.Jx_ptr() };
+    double* RESTRICT Jx{ grid.Jx_ptr() }; ASSUME_ALIGNED(Jx, SIMD_BYTES);
 
     for ( std::size_t x{ x_start_ }; x < x_end_; ++x ) {
         std::size_t const i{ grid.idx(x,y_,z_) };
@@ -19,8 +19,8 @@ void AC_Current_Loop::apply( Grid &grid, std::size_t const time_step ) {
     double const omega{ 2.0 * std::numbers::pi * frequency_ };
     double const current{ amplitude_ * std::sin( omega * static_cast<double>( time_step ) * grid.dt() ) };
 
-    double* RESTRICT Jx{ grid.Jx_ptr() };
-    double* RESTRICT Jy{ grid.Jy_ptr() };
+    double* RESTRICT Jx{ grid.Jx_ptr() }; ASSUME_ALIGNED(Jx, SIMD_BYTES);
+    double* RESTRICT Jy{ grid.Jy_ptr() }; ASSUME_ALIGNED(Jy, SIMD_BYTES);
 
     std::size_t const x_f{ 3 * grid.Nx() / 4 };
     std::size_t const x_i{ grid.Nx() / 4 };
@@ -45,8 +45,8 @@ void AC_Concentric_Rings::apply( Grid &grid, std::size_t const time_step ) {
     double const omega{ 2.0 * std::numbers::pi * frequency_ };
     double const current{ amplitude_ * std::sin( omega * static_cast<double>( time_step ) * grid.dt() ) };
 
-    double* RESTRICT Jx{ grid.Jx_ptr() };
-    double* RESTRICT Jy{ grid.Jy_ptr() };
+    double* RESTRICT Jx{ grid.Jx_ptr() }; ASSUME_ALIGNED(Jx, SIMD_BYTES);
+    double* RESTRICT Jy{ grid.Jy_ptr() }; ASSUME_ALIGNED(Jy, SIMD_BYTES);
 
     // Define the outermost boundary of the largest rings
     std::size_t const x_outer_min{ grid.Nx() / 4 };
@@ -91,9 +91,9 @@ void Point_Source::apply( Grid &grid, std::size_t const time_step ) {
     ( void )time_step;
     std::size_t const i{ grid.idx(x_,y_,z_) };
 
-    double* RESTRICT Jx{ grid.Jx_ptr() };
-    double* RESTRICT Jy{ grid.Jy_ptr() };
-    double* RESTRICT Jz{ grid.Jz_ptr() };
+    double* RESTRICT Jx{ grid.Jx_ptr() }; ASSUME_ALIGNED(Jx, SIMD_BYTES);
+    double* RESTRICT Jy{ grid.Jy_ptr() }; ASSUME_ALIGNED(Jy, SIMD_BYTES);
+    double* RESTRICT Jz{ grid.Jz_ptr() }; ASSUME_ALIGNED(Jz, SIMD_BYTES);
 
     Jx[i] = value_;
     Jy[i] = value_;
@@ -102,7 +102,7 @@ void Point_Source::apply( Grid &grid, std::size_t const time_step ) {
 
 void Gaussian_Pulse::apply( Grid& grid, std::size_t const time_step ) {
     std::size_t const i{ grid.idx(x_,y_,z_) };
-    double* RESTRICT Jz{ grid.Jz_ptr() };
+    double* RESTRICT Jz{ grid.Jz_ptr() }; ASSUME_ALIGNED(Jz, SIMD_BYTES);
 
     double const t{ static_cast<double>( time_step ) * grid.dt() };
     double const factor{ ( t - t_0_ ) / width_ };

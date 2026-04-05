@@ -75,25 +75,12 @@ void PML::update_H_psi(
     double const dx, double const dy, double const dz ) {
     if ( !is_active() ) return;
 
-    std::size_t const t{ thickness() };
-    std::size_t const face_x{ psi_face_x() };
-    std::size_t const face_y{ psi_face_y() };
-    std::size_t const face_z{ psi_face_z() };
-
-    std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx_padded() };
-    std::size_t const Sz{ Nx_padded() * Ny_padded() };
-
-    double const inv_dx{ 1.0 / dx };
-    double const inv_dy{ 1.0 / dy };
-    double const inv_dz{ 1.0 / dz };
-
-    double const* RESTRICT bHx{ b_Hx_ptr() };
-    double const* RESTRICT cHx{ c_Hx_ptr() };
-    double const* RESTRICT bHy{ b_Hy_ptr() };
-    double const* RESTRICT cHy{ c_Hy_ptr() };
-    double const* RESTRICT bHz{ b_Hz_ptr() };
-    double const* RESTRICT cHz{ c_Hz_ptr() };
+    double const* RESTRICT bHx{ b_Hx_ptr() }; ASSUME_ALIGNED(bHx, SIMD_BYTES);
+    double const* RESTRICT cHx{ c_Hx_ptr() }; ASSUME_ALIGNED(cHx, SIMD_BYTES);
+    double const* RESTRICT bHy{ b_Hy_ptr() }; ASSUME_ALIGNED(bHy, SIMD_BYTES);
+    double const* RESTRICT cHy{ c_Hy_ptr() }; ASSUME_ALIGNED(cHy, SIMD_BYTES);
+    double const* RESTRICT bHz{ b_Hz_ptr() }; ASSUME_ALIGNED(bHz, SIMD_BYTES);
+    double const* RESTRICT cHz{ c_Hz_ptr() }; ASSUME_ALIGNED(cHz, SIMD_BYTES);
 
     double* RESTRICT pHyx{ psi_Hyx_ptr() };
     double* RESTRICT pHzx{ psi_Hzx_ptr() };
@@ -102,16 +89,22 @@ void PML::update_H_psi(
     double* RESTRICT pHxz{ psi_Hxz_ptr() };
     double* RESTRICT pHyz{ psi_Hyz_ptr() };
 
-    ASSUME_ALIGNED(bHx, SIMD_BYTES);
-    ASSUME_ALIGNED(cHx, SIMD_BYTES);
-    ASSUME_ALIGNED(bHy, SIMD_BYTES);
-    ASSUME_ALIGNED(cHy, SIMD_BYTES);
-    ASSUME_ALIGNED(bHz, SIMD_BYTES);
-    ASSUME_ALIGNED(cHz, SIMD_BYTES);
-
     std::size_t const Nx_local{ Nx() };
     std::size_t const Ny_local{ Ny() };
     std::size_t const Nz_local{ Nz() };
+
+    double const inv_dx{ 1.0 / dx };
+    double const inv_dy{ 1.0 / dy };
+    double const inv_dz{ 1.0 / dz };
+
+    std::size_t const t{ thickness() };
+    std::size_t const face_x{ psi_face_x() };
+    std::size_t const face_y{ psi_face_y() };
+    std::size_t const face_z{ psi_face_z() };
+
+    std::size_t const Sx{ 1 };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     std::size_t const x_hi_base{ Nx_local - 1 - t };
 
@@ -250,25 +243,12 @@ void PML::update_E_psi(
     double const dx, double const dy, double const dz ) {
     if ( !is_active() ) return;
 
-    std::size_t const t{ thickness() };
-    std::size_t const face_x{ psi_face_x() };
-    std::size_t const face_y{ psi_face_y() };
-    std::size_t const face_z{ psi_face_z() };
-
-    std::size_t const Sx{ 1 };
-    std::size_t const Sy{ Nx_padded() };
-    std::size_t const Sz{ Nx_padded() * Ny_padded() };
-
-    double const inv_dx{ 1.0 / dx };
-    double const inv_dy{ 1.0 / dy };
-    double const inv_dz{ 1.0 / dz };
-
-    double const* RESTRICT bEx{ b_Ex_ptr() };
-    double const* RESTRICT cEx{ c_Ex_ptr() };
-    double const* RESTRICT bEy{ b_Ey_ptr() };
-    double const* RESTRICT cEy{ c_Ey_ptr() };
-    double const* RESTRICT bEz{ b_Ez_ptr() };
-    double const* RESTRICT cEz{ c_Ez_ptr() };
+    double const* RESTRICT bEx{ b_Ex_ptr() }; ASSUME_ALIGNED(bEx, SIMD_BYTES);
+    double const* RESTRICT cEx{ c_Ex_ptr() }; ASSUME_ALIGNED(cEx, SIMD_BYTES);
+    double const* RESTRICT bEy{ b_Ey_ptr() }; ASSUME_ALIGNED(bEy, SIMD_BYTES);
+    double const* RESTRICT cEy{ c_Ey_ptr() }; ASSUME_ALIGNED(cEy, SIMD_BYTES);
+    double const* RESTRICT bEz{ b_Ez_ptr() }; ASSUME_ALIGNED(bEz, SIMD_BYTES);
+    double const* RESTRICT cEz{ c_Ez_ptr() }; ASSUME_ALIGNED(cEz, SIMD_BYTES);
 
     double* RESTRICT pEyx{ psi_Eyx_ptr() };
     double* RESTRICT pEzx{ psi_Ezx_ptr() };
@@ -277,16 +257,22 @@ void PML::update_E_psi(
     double* RESTRICT pExz{ psi_Exz_ptr() };
     double* RESTRICT pEyz{ psi_Eyz_ptr() };
 
-    ASSUME_ALIGNED(bEx, SIMD_BYTES);
-    ASSUME_ALIGNED(cEx, SIMD_BYTES);
-    ASSUME_ALIGNED(bEy, SIMD_BYTES);
-    ASSUME_ALIGNED(cEy, SIMD_BYTES);
-    ASSUME_ALIGNED(bEz, SIMD_BYTES);
-    ASSUME_ALIGNED(cEz, SIMD_BYTES);
-
     std::size_t const Nx_local{ Nx() };
     std::size_t const Ny_local{ Ny() };
     std::size_t const Nz_local{ Nz() };
+
+    double const inv_dx{ 1.0 / dx };
+    double const inv_dy{ 1.0 / dy };
+    double const inv_dz{ 1.0 / dz };
+
+    std::size_t const t{ thickness() };
+    std::size_t const face_x{ psi_face_x() };
+    std::size_t const face_y{ psi_face_y() };
+    std::size_t const face_z{ psi_face_z() };
+
+    std::size_t const Sx{ 1 };
+    std::size_t const Sy{ Nx_padded() };
+    std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
     std::size_t const d_max_lo_x{ std::min( t, Nx_local - 2 ) };
     std::size_t const d_max_hi_x{ ( t >= 2 ) ? t - 1 : std::size_t{0} };

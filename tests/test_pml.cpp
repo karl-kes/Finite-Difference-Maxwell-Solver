@@ -3,9 +3,7 @@
 #include "../src/Classes/PML/pml.hpp"
 #include <cmath>
 
-// ============================================================================
 // PML Unit Tests
-// ============================================================================
 
 TEST(PML, ActiveWhenConfigured) {
     Simulation_Config cfg{};

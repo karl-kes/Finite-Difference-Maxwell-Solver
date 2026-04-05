@@ -21,35 +21,41 @@ void Simulation::print_progress( std::size_t const current, std::size_t const to
 void Simulation::initialize_sources() {
     // Constants:
     double const initial_time{ 0 };
-    double const c{ 1.0 / std::sqrt( config_.eps * config_.mu ) };
-    double const cells_per_wavelength{ static_cast<double>( grid_.Nx() ) / 2.0 };
-    double const freq{ c / ( cells_per_wavelength * grid_.dx() ) };
+    double const c{ 1.0 / std::sqrt( config().eps * config().mu ) };
+    
+    // Calculate usable grid space excluding the absorbing boundary:
+    std::size_t const pml_t{ config().use_pml ? config().pml_thickness : 0 };
+    std::size_t const usable_cells{ grid().Nx() > 2 * pml_t ? grid().Nx() - 2 * pml_t : 1 };
+
+    // Enforce a strict minimum of 40 cells for high resolution:
+    double const cells_per_wavelength{ std::max( 40.0, static_cast<double>( usable_cells ) * 0.2 ) };
+    double const freq{ c / ( cells_per_wavelength * grid().dx() ) };
     double const amp{ 1.0 };
 
     // Grid points:
-    std::size_t const half_z{ grid_.Nz() / 2 };
-    std::size_t const half_y{ grid_.Ny() / 2 };
-    std::size_t const half_x{ grid_.Nx() / 2 };
+    std::size_t const half_z{ grid().Nz() / 2 };
+    std::size_t const half_y{ grid().Ny() / 2 };
+    std::size_t const half_x{ grid().Nx() / 2 };
 
     std::size_t const start_x{ 0 };
-    std::size_t const end_x{ grid_.Nx() };
+    std::size_t const end_x{ grid().Nx() };
 
     // AC current wire loop:
-    grid_.add_source( std::make_unique<AC_Current_Loop>(
+    grid().add_source( std::make_unique<AC_Current_Loop>(
         amp,
         freq,
         half_z
     ) );
 
     // // AC current concentric rings:
-    // grid_.add_source( std::make_unique<AC_Concentric_Rings>(
+    // grid().add_source( std::make_unique<AC_Concentric_Rings>(
     //     amp,
     //     freq,
     //     half_z
     // ) );
 
     // // AC current wire along x:
-    // grid_.add_source( std::make_unique<Straight_Wire_X>(
+    // grid().add_source( std::make_unique<Straight_Wire_X>(
     //     amp,
     //     freq,
     //     half_y,
@@ -59,7 +65,7 @@ void Simulation::initialize_sources() {
     // ) );
 
     // // Point source:
-    // grid_.add_source( std::make_unique<Point_Source>(
+    // grid().add_source( std::make_unique<Point_Source>(
     //     amp,
     //     half_x,
     //     half_y,
@@ -67,7 +73,7 @@ void Simulation::initialize_sources() {
     // ) );
 
     // // Gaussian pulse:
-    // grid_.add_source( std::make_unique<Gaussian_Pulse>(
+    // grid().add_source( std::make_unique<Gaussian_Pulse>(
     //     amp,
     //     initial_time,
     //     freq,
@@ -78,30 +84,34 @@ void Simulation::initialize_sources() {
 }
 
 void Simulation::initialize() {
-    output_.initialize( grid_ );
+    output().initialize( grid() );
     initialize_sources();
 }
 
 void Simulation::run() {
-    std::cout << "<---- Maxwell Simulation ---->" << std::endl;
+    // Initialize loop variables:
+    std::size_t const output_interval{ config().output_interval() };
+    std::size_t const total_steps{ config().total_steps };
 
-    // Run simulation and start timer:
-    std::size_t const output_interval{ config_.output_interval() };
+    std::cout << "<---- Maxwell Simulation ---->" << std::endl;
     auto const start_time{ std::chrono::high_resolution_clock::now() };
 
     // Simulation Loop:
-    for ( std::size_t curr_time{1}; curr_time <= config_.total_steps; ++curr_time ) {
-        grid_.apply_sources( curr_time );
-        grid_.step();
+    for ( std::size_t current_step{}; current_step < total_steps; ++current_step ) {
+        grid().apply_sources( current_step );
+        grid().step();
 
-        if ( ( curr_time % output_interval ) == 0 ) {
-            output_.write_field( grid_ );
-            print_progress( curr_time, config_.total_steps );
+        if ( ( current_step % output_interval ) == 0 ) {
+            output().write_field( grid() );
+            print_progress( current_step, total_steps );
         }
     }
 
+    // Ensure progress bar ends at 100%:
+    std::cout << "\rProgress: " << 100.0 << "%" << std::flush;
+
     // End Outputs:
-    output_.finalize();
+    output().finalize();
 
     // End Timer:
     auto const end_time{ std::chrono::high_resolution_clock::now() };
@@ -111,5 +121,5 @@ void Simulation::run() {
     std::cout << "\n\nResults:\n";
     std::cout << "--------\n";
     std::cout << "Duration: " << duration.count() << " ms\n";
-    std::cout << "Physical time: " << static_cast<double>( config_.total_steps ) * grid_.dt() << " s\n";
+    std::cout << "Physical time: " << static_cast<double>( total_steps ) * grid().dt() << " s\n";
 }

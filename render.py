@@ -37,7 +37,7 @@ arrow_scale = 1.5    # Arrow length scaling
 
 # Per-field thresholds and radii:
 e_mag_thresh   = 0.15
-e_arrow_thresh = 0.225
+e_arrow_thresh = 0.25
 e_radius_min   = 0.10
 e_radius_max   = 0.35
 

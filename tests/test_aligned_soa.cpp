@@ -2,9 +2,7 @@
 #include "../src/Utilities/aligned_soa.hpp"
 #include <cstdint>
 
-// ============================================================================
 // AlignedSoA Unit Tests
-// ============================================================================
 
 TEST(AlignedSoA, RoundUpMultipleOfSimdWidth) {
     constexpr std::size_t elems_per_align = SIMD_BYTES / sizeof(double);

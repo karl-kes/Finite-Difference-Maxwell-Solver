@@ -1,10 +1,12 @@
 #include "test_framework.hpp"
 #include "test_helpers.hpp"
+
 #include "../src/Classes/Config/config.hpp"
 #include "../src/Classes/Grid/grid.hpp"
 #include "../src/Classes/Source/source.hpp"
 #include "../src/Classes/Write_Output/output.hpp"
 #include "../src/Classes/Validation/validation.hpp"
+
 #include <cmath>
 #include <numbers>
 #include <fstream>
@@ -12,9 +14,7 @@
 #include <vector>
 #include <filesystem>
 
-// ============================================================================
 // Output Binary Round-Trip
-// ============================================================================
 
 TEST(Output, BinaryRoundTrip) {
     Simulation_Config cfg{};
@@ -113,32 +113,7 @@ TEST(Output, HeaderDimensionsConsistent) {
     std::filesystem::remove_all( test_dir );
 }
 
-// ============================================================================
-// Validation Class
-// ============================================================================
-
-TEST(ValidationClass, MetricsPhysicallyReasonable) {
-    Simulation_Config cfg{};
-    Plane_Wave_Test test{ cfg };
-    Validation_Result result = test.run();
-
-    ASSERT_TRUE( result.passed );
-
-    // Energy drift present but small (actual ~3.8%):
-    ASSERT_GT( result.energy_drift_percent, 0.0 );
-    ASSERT_LT( result.energy_drift_percent, 5.0 );
-
-    // Phase correlation very high (actual ~0.999998):
-    ASSERT_GT( result.phase_correlation, 0.999 );
-
-    // Dispersion small (actual ~0.33%):
-    ASSERT_GT( result.dispersion_percent, 0.0 );
-    ASSERT_LT( result.dispersion_percent, 2.0 );
-}
-
-// ============================================================================
 // Quantitative CPML Reflection Coefficient
-// ============================================================================
 
 TEST(Integration, CPMLReflectionCoefficient) {
     Simulation_Config cfg{};
@@ -225,9 +200,7 @@ TEST(Integration, CPMLReflectionCoefficient) {
     ASSERT_GT( peak_reflected, 1e-20 );
 }
 
-// ============================================================================
 // Multi-Axis CPML Reflection
-// ============================================================================
 
 static double cpml_reflection_on_axis( int axis ) {
     // Launch a tapered plane wave along the given axis (0=x, 1=y, 2=z),

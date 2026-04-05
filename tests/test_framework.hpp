@@ -96,9 +96,7 @@ inline int run_all( std::string const& filter = "" ) {
     std::vector<TestResult> results;
     std::size_t passed{}, failed{};
 
-    std::cout << "\n========================================\n";
-    std::cout << "  FDTD Test Suite\n";
-    std::cout << "========================================\n\n";
+    std::cout << "\n<--- FDTD Test Suite --->\n\n";
 
     std::string current_suite;
 

@@ -46,13 +46,24 @@ private:
     PML pml_;
 
     // Private Methods:
+    [[nodiscard]] PML &pml() { return pml_; }
     [[nodiscard]] PML const &pml() const { return pml_; }
 
-    
+    [[nodiscard]] std::vector<std::unique_ptr<Source>> &sources() { return sources_; }
+    [[nodiscard]] std::vector<std::unique_ptr<Source>> const &sources() const { return sources_; }
+
 public:
     // Constructor:
     explicit Grid( Simulation_Config const &config );
     ~Grid();
+
+    // Move Semantics:
+    Grid( Grid&& ) noexcept = default;
+    Grid& operator=( Grid&& ) noexcept = default;
+
+    // Copy Semantics:
+    Grid( const Grid& ) = delete;
+    Grid& operator=( const Grid& ) = delete;
 
     // System Simulation:
     void step();

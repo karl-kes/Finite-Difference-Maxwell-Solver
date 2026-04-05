@@ -12,9 +12,7 @@
 #include <cstdint>
 #include <vector>
 
-// ============================================================================
 // Grid Construction & Properties
-// ============================================================================
 
 TEST(Grid, DimensionsMatchConfig) {
     Simulation_Config cfg{};
@@ -66,9 +64,7 @@ TEST(Grid, FieldWriteRead) {
     ASSERT_NEAR( grid.field( Field::MAGNETIC, Component::Z, 25, 30, 35 ), -2.71, 1e-15 );
 }
 
-// ============================================================================
 // Coefficient Baking
-// ============================================================================
 
 TEST(Grid, VacuumCoefficientsBaked) {
     // With sigma=0: Ca=1, Cb=dt/eps, Db=dt/mu.
@@ -91,9 +87,7 @@ TEST(Grid, VacuumCoefficientsBaked) {
     ASSERT_NEAR( grid.Db_z_ptr()[i], expected_Db, 1e-14 );
 }
 
-// ============================================================================
 // Energy Diagnostics
-// ============================================================================
 
 TEST(Grid, EnergyDecompositionConsistent) {
     // e_energy() + h_energy() must equal total_energy() exactly.
@@ -112,9 +106,7 @@ TEST(Grid, EnergyDecompositionConsistent) {
     ASSERT_NEAR( ee + he, te, 1e-15 );
 }
 
-// ============================================================================
 // Non-Cubic Grid
-// ============================================================================
 
 TEST(Grid, NonCubicSingleStepCurl) {
     // With dx != dy != dz, the curl must use the correct spatial step for
@@ -147,9 +139,7 @@ TEST(Grid, NonCubicSingleStepCurl) {
     ASSERT_TRUE( std::abs( -Db / cfg.dz - ( -Db / cfg.dx ) ) > 0.1 );
 }
 
-// ============================================================================
 // Config Parser
-// ============================================================================
 
 TEST(Grid, ConfigFromFileRoundTrip) {
     std::string const path{ "test_config_roundtrip.cfg" };
@@ -188,9 +178,7 @@ TEST(Grid, ConfigMissingFileUsesDefaults) {
     ASSERT_NEAR( cfg.cfl_factor, 1.0, 1e-15 );
 }
 
-// ============================================================================
 // Output: H-Field Yee Averaging
-// ============================================================================
 
 TEST(Output, HFieldYeeAveraging) {
     // Set Hx = x and verify the binary output contains the correct
@@ -241,9 +229,7 @@ TEST(Output, HFieldYeeAveraging) {
     std::filesystem::remove_all( test_dir );
 }
 
-// ============================================================================
 // Source Application
-// ============================================================================
 
 TEST(Source, PointSourceInjectsAllComponents) {
     Simulation_Config cfg{};
@@ -313,7 +299,7 @@ TEST(Source, ACCurrentLoopGeometryAndCirculation) {
 
     ASSERT_GT( jx_bottom, 0.0 );                      // Bottom: +x current
     ASSERT_NEAR( jx_top, -jx_bottom, 1e-15 );         // Top: -x current
-    ASSERT_GT( jy_right, 0.0 );                        // Right: +y current
+    ASSERT_GT( jy_right, 0.0 );                       // Right: +y current
     ASSERT_NEAR( jy_left, -jy_right, 1e-15 );         // Left: -y current
     ASSERT_NEAR( jx_bottom, jy_right, 1e-15 );        // Same magnitude
 
@@ -329,9 +315,7 @@ TEST(Source, ACCurrentLoopGeometryAndCirculation) {
     ASSERT_GT( hz_center, 0.0 );
 }
 
-// ============================================================================
 // Lossy Coefficient Baking (end-to-end via bake_coefficients)
-// ============================================================================
 
 TEST(Grid, LossyBakeCoefficients) {
     // Set sigma > 0 on a region, rebake, verify Ca < 1 and Cb < dt/eps
@@ -416,9 +400,7 @@ TEST(Grid, LossyDecayBehavior) {
     ASSERT_LT( ey_lossy, ey_vacuum );
 }
 
-// ============================================================================
 // Independent H/E Update Half-Steps
-// ============================================================================
 
 TEST(Grid, UpdateHIndependent) {
     // Call update_H() alone. Starting from Ey=1 at center, only H should

@@ -21,16 +21,27 @@ Grid::Grid( Simulation_Config const &config )
 , data_{ Nx_padded_ * Ny_padded_ * Nz_padded_, NUM_ARRAYS_ }
 , pml_{ config } {
     std::size_t const total{ Nx_padded_ * Ny_padded_ * Nz_padded_ };
+    double const cfg_eps{ config.eps };
+    double const cfg_mu{ config.mu };
 
-    // Default initialize eps:
-    std::fill_n( eps_x_ptr(), total, config.eps );
-    std::fill_n( eps_y_ptr(), total, config.eps );
-    std::fill_n( eps_z_ptr(), total, config.eps );
+    double* RESTRICT eps_x{ eps_x_ptr() }; ASSUME_ALIGNED(eps_x, SIMD_BYTES);
+    double* RESTRICT eps_y{ eps_y_ptr() }; ASSUME_ALIGNED(eps_y, SIMD_BYTES);
+    double* RESTRICT eps_z{ eps_z_ptr() }; ASSUME_ALIGNED(eps_z, SIMD_BYTES);
 
-    // Default initialize mu:
-    std::fill_n( mu_x_ptr(), total, config.mu );
-    std::fill_n( mu_y_ptr(), total, config.mu );
-    std::fill_n( mu_z_ptr(), total, config.mu );
+    double* RESTRICT mu_x{ mu_x_ptr() }; ASSUME_ALIGNED(mu_x, SIMD_BYTES);
+    double* RESTRICT mu_y{ mu_y_ptr() }; ASSUME_ALIGNED(mu_y, SIMD_BYTES);
+    double* RESTRICT mu_z{ mu_z_ptr() }; ASSUME_ALIGNED(mu_z, SIMD_BYTES);
+
+    // Default initialize mu and eps:
+    for ( std::size_t i = 0; i < total; ++i ) {
+        eps_x[i] = cfg_eps;
+        eps_y[i] = cfg_eps;
+        eps_z[i] = cfg_eps;
+
+        mu_x[i] = cfg_mu;
+        mu_y[i] = cfg_mu;
+        mu_z[i] = cfg_mu;
+    }
 
     // sig arrays are already zero from AlignedSoA zero-init.
 
@@ -42,69 +53,82 @@ Grid::~Grid() = default;
 
 void Grid::bake_coefficients() {
     std::size_t const total{ Nx_padded() * Ny_padded() * Nz_padded() };
+    double const dt_local{ dt() };
+
+    double const* RESTRICT eps_x{ eps_x_ptr() }; ASSUME_ALIGNED(eps_x, SIMD_BYTES);
+    double const* RESTRICT eps_y{ eps_y_ptr() }; ASSUME_ALIGNED(eps_y, SIMD_BYTES);
+    double const* RESTRICT eps_z{ eps_z_ptr() }; ASSUME_ALIGNED(eps_z, SIMD_BYTES);
+
+    double const* RESTRICT sig_x{ sig_x_ptr() }; ASSUME_ALIGNED(sig_x, SIMD_BYTES);
+    double const* RESTRICT sig_y{ sig_y_ptr() }; ASSUME_ALIGNED(sig_y, SIMD_BYTES);
+    double const* RESTRICT sig_z{ sig_z_ptr() }; ASSUME_ALIGNED(sig_z, SIMD_BYTES);
+
+    double const* RESTRICT mu_x{ mu_x_ptr() }; ASSUME_ALIGNED(mu_x, SIMD_BYTES);
+    double const* RESTRICT mu_y{ mu_y_ptr() }; ASSUME_ALIGNED(mu_y, SIMD_BYTES);
+    double const* RESTRICT mu_z{ mu_z_ptr() }; ASSUME_ALIGNED(mu_z, SIMD_BYTES);
+
+    double* RESTRICT Ca_x{ Ca_x_ptr() }; ASSUME_ALIGNED(Ca_x, SIMD_BYTES);
+    double* RESTRICT Ca_y{ Ca_y_ptr() }; ASSUME_ALIGNED(Ca_y, SIMD_BYTES);
+    double* RESTRICT Ca_z{ Ca_z_ptr() }; ASSUME_ALIGNED(Ca_z, SIMD_BYTES);
+
+    double* RESTRICT Cb_x{ Cb_x_ptr() }; ASSUME_ALIGNED(Cb_x, SIMD_BYTES);
+    double* RESTRICT Cb_y{ Cb_y_ptr() }; ASSUME_ALIGNED(Cb_y, SIMD_BYTES);
+    double* RESTRICT Cb_z{ Cb_z_ptr() }; ASSUME_ALIGNED(Cb_z, SIMD_BYTES);
+
+    double* RESTRICT Db_x{ Db_x_ptr() }; ASSUME_ALIGNED(Db_x, SIMD_BYTES);
+    double* RESTRICT Db_y{ Db_y_ptr() }; ASSUME_ALIGNED(Db_y, SIMD_BYTES);
+    double* RESTRICT Db_z{ Db_z_ptr() }; ASSUME_ALIGNED(Db_z, SIMD_BYTES);
 
     #pragma omp simd
     for ( std::size_t i = 0; i < total; ++i ) {
         // Losses in all components:
-        double const loss_x{ sig_x_ptr()[i] * dt() / ( 2.0 * eps_x_ptr()[i] ) };
-        double const loss_y{ sig_y_ptr()[i] * dt() / ( 2.0 * eps_y_ptr()[i] ) };
-        double const loss_z{ sig_z_ptr()[i] * dt() / ( 2.0 * eps_z_ptr()[i] ) };
+        double const loss_x{ sig_x[i] * dt_local / ( 2.0 * eps_x[i] ) };
+        double const loss_y{ sig_y[i] * dt_local / ( 2.0 * eps_y[i] ) };
+        double const loss_z{ sig_z[i] * dt_local / ( 2.0 * eps_z[i] ) };
 
         // C_a constant:
-        Ca_x_ptr()[i] = ( 1.0 - loss_x ) / ( 1.0 + loss_x );
-        Ca_y_ptr()[i] = ( 1.0 - loss_y ) / ( 1.0 + loss_y );
-        Ca_z_ptr()[i] = ( 1.0 - loss_z ) / ( 1.0 + loss_z );
+        Ca_x[i] = ( 1.0 - loss_x ) / ( 1.0 + loss_x );
+        Ca_y[i] = ( 1.0 - loss_y ) / ( 1.0 + loss_y );
+        Ca_z[i] = ( 1.0 - loss_z ) / ( 1.0 + loss_z );
 
-        double const denom_x{ eps_x_ptr()[i] / dt() + sig_x_ptr()[i] / 2.0 };
-        double const denom_y{ eps_y_ptr()[i] / dt() + sig_y_ptr()[i] / 2.0 };
-        double const denom_z{ eps_z_ptr()[i] / dt() + sig_z_ptr()[i] / 2.0 };
+        double const denom_x{ eps_x[i] / dt_local + sig_x[i] / 2.0 };
+        double const denom_y{ eps_y[i] / dt_local + sig_y[i] / 2.0 };
+        double const denom_z{ eps_z[i] / dt_local + sig_z[i] / 2.0 };
         
         // C_b constant:
-        Cb_x_ptr()[i] = 1.0 / denom_x;
-        Cb_y_ptr()[i] = 1.0 / denom_y;
-        Cb_z_ptr()[i] = 1.0 / denom_z;
+        Cb_x[i] = 1.0 / denom_x;
+        Cb_y[i] = 1.0 / denom_y;
+        Cb_z[i] = 1.0 / denom_z;
 
         // D_b constant:
-        Db_x_ptr()[i] = dt() / mu_x_ptr()[i];
-        Db_y_ptr()[i] = dt() / mu_y_ptr()[i];
-        Db_z_ptr()[i] = dt() / mu_z_ptr()[i];
+        Db_x[i] = dt_local / mu_x[i];
+        Db_y[i] = dt_local / mu_y[i];
+        Db_z[i] = dt_local / mu_z[i];
     }
 }
 
 void Grid::add_source( std::unique_ptr<Source> source ) {
-    sources_.push_back( std::move( source ) );
+    sources().emplace_back( std::move( source ) );
 }
 
 void Grid::apply_sources( std::size_t const time_step ) {
-    for ( auto const &source : sources_ ) {
+    for ( auto const &source : sources() ) {
         source->apply( *this, time_step );
     }
 }
 
 void Grid::update_H() {
-    double* RESTRICT Hx{ Hx_ptr() };
-    double* RESTRICT Hy{ Hy_ptr() };
-    double* RESTRICT Hz{ Hz_ptr() };
+    double* RESTRICT Hx{ Hx_ptr() }; ASSUME_ALIGNED(Hx, SIMD_BYTES);
+    double* RESTRICT Hy{ Hy_ptr() }; ASSUME_ALIGNED(Hy, SIMD_BYTES);
+    double* RESTRICT Hz{ Hz_ptr() }; ASSUME_ALIGNED(Hz, SIMD_BYTES);
 
-    double* RESTRICT Ex{ Ex_ptr() };
-    double* RESTRICT Ey{ Ey_ptr() };
-    double* RESTRICT Ez{ Ez_ptr() };
+    double* RESTRICT Ex{ Ex_ptr() }; ASSUME_ALIGNED(Ex, SIMD_BYTES);
+    double* RESTRICT Ey{ Ey_ptr() }; ASSUME_ALIGNED(Ey, SIMD_BYTES);
+    double* RESTRICT Ez{ Ez_ptr() }; ASSUME_ALIGNED(Ez, SIMD_BYTES);
 
-    double* RESTRICT Db_x{ Db_x_ptr() };
-    double* RESTRICT Db_y{ Db_y_ptr() };
-    double* RESTRICT Db_z{ Db_z_ptr() };
-
-    ASSUME_ALIGNED(Ex, SIMD_BYTES);
-    ASSUME_ALIGNED(Ey, SIMD_BYTES);
-    ASSUME_ALIGNED(Ez, SIMD_BYTES);
-
-    ASSUME_ALIGNED(Hx, SIMD_BYTES);
-    ASSUME_ALIGNED(Hy, SIMD_BYTES);
-    ASSUME_ALIGNED(Hz, SIMD_BYTES);
-
-    ASSUME_ALIGNED(Db_x, SIMD_BYTES);
-    ASSUME_ALIGNED(Db_y, SIMD_BYTES);
-    ASSUME_ALIGNED(Db_z, SIMD_BYTES);
+    double* RESTRICT Db_x{ Db_x_ptr() }; ASSUME_ALIGNED(Db_x, SIMD_BYTES);
+    double* RESTRICT Db_y{ Db_y_ptr() }; ASSUME_ALIGNED(Db_y, SIMD_BYTES);
+    double* RESTRICT Db_z{ Db_z_ptr() }; ASSUME_ALIGNED(Db_z, SIMD_BYTES);
 
     double const inv_dx{ 1.0 / dx() };
     double const inv_dy{ 1.0 / dy() };
@@ -149,7 +173,7 @@ void Grid::update_H() {
         }
     }
 
-    pml_.update_H_psi(
+    pml().update_H_psi(
         Ex_ptr(), Ey_ptr(), Ez_ptr(),
         Hx_ptr(), Hy_ptr(), Hz_ptr(),
         Db_x_ptr(), Db_y_ptr(), Db_z_ptr(),
@@ -158,45 +182,25 @@ void Grid::update_H() {
 }
 
 void Grid::update_E() {
-    double* RESTRICT Hx{ Hx_ptr() };
-    double* RESTRICT Hy{ Hy_ptr() };
-    double* RESTRICT Hz{ Hz_ptr() };
+    double* RESTRICT Ex{ Ex_ptr() }; ASSUME_ALIGNED(Ex, SIMD_BYTES);
+    double* RESTRICT Ey{ Ey_ptr() }; ASSUME_ALIGNED(Ey, SIMD_BYTES);
+    double* RESTRICT Ez{ Ez_ptr() }; ASSUME_ALIGNED(Ez, SIMD_BYTES);
 
-    double* RESTRICT Ex{ Ex_ptr() };
-    double* RESTRICT Ey{ Ey_ptr() };
-    double* RESTRICT Ez{ Ez_ptr() };
+    double* RESTRICT Hx{ Hx_ptr() }; ASSUME_ALIGNED(Hx, SIMD_BYTES);
+    double* RESTRICT Hy{ Hy_ptr() }; ASSUME_ALIGNED(Hy, SIMD_BYTES);
+    double* RESTRICT Hz{ Hz_ptr() }; ASSUME_ALIGNED(Hz, SIMD_BYTES);
 
-    double* RESTRICT Jx{ Jx_ptr() };
-    double* RESTRICT Jy{ Jy_ptr() };
-    double* RESTRICT Jz{ Jz_ptr() };
+    double* RESTRICT Jx{ Jx_ptr() }; ASSUME_ALIGNED(Jx, SIMD_BYTES);
+    double* RESTRICT Jy{ Jy_ptr() }; ASSUME_ALIGNED(Jy, SIMD_BYTES);
+    double* RESTRICT Jz{ Jz_ptr() }; ASSUME_ALIGNED(Jz, SIMD_BYTES);
 
-    double* RESTRICT Ca_x{ Ca_x_ptr() };
-    double* RESTRICT Ca_y{ Ca_y_ptr() };
-    double* RESTRICT Ca_z{ Ca_z_ptr() };
+    double* RESTRICT Ca_x{ Ca_x_ptr() }; ASSUME_ALIGNED(Ca_x, SIMD_BYTES);
+    double* RESTRICT Ca_y{ Ca_y_ptr() }; ASSUME_ALIGNED(Ca_y, SIMD_BYTES);
+    double* RESTRICT Ca_z{ Ca_z_ptr() }; ASSUME_ALIGNED(Ca_z, SIMD_BYTES);
 
-    double* RESTRICT Cb_x{ Cb_x_ptr() };
-    double* RESTRICT Cb_y{ Cb_y_ptr() };
-    double* RESTRICT Cb_z{ Cb_z_ptr() };
-
-    ASSUME_ALIGNED(Ex, SIMD_BYTES);
-    ASSUME_ALIGNED(Ey, SIMD_BYTES);
-    ASSUME_ALIGNED(Ez, SIMD_BYTES);
-
-    ASSUME_ALIGNED(Hx, SIMD_BYTES);
-    ASSUME_ALIGNED(Hy, SIMD_BYTES);
-    ASSUME_ALIGNED(Hz, SIMD_BYTES);
-
-    ASSUME_ALIGNED(Jx, SIMD_BYTES);
-    ASSUME_ALIGNED(Jy, SIMD_BYTES);
-    ASSUME_ALIGNED(Jz, SIMD_BYTES);
-
-    ASSUME_ALIGNED(Ca_x, SIMD_BYTES);
-    ASSUME_ALIGNED(Ca_y, SIMD_BYTES);
-    ASSUME_ALIGNED(Ca_z, SIMD_BYTES);
-
-    ASSUME_ALIGNED(Cb_x, SIMD_BYTES);
-    ASSUME_ALIGNED(Cb_y, SIMD_BYTES);
-    ASSUME_ALIGNED(Cb_z, SIMD_BYTES);
+    double* RESTRICT Cb_x{ Cb_x_ptr() }; ASSUME_ALIGNED(Cb_x, SIMD_BYTES);
+    double* RESTRICT Cb_y{ Cb_y_ptr() }; ASSUME_ALIGNED(Cb_y, SIMD_BYTES);
+    double* RESTRICT Cb_z{ Cb_z_ptr() }; ASSUME_ALIGNED(Cb_z, SIMD_BYTES);
 
     double const inv_dx{ 1.0 / dx() };
     double const inv_dy{ 1.0 / dy() };
@@ -241,7 +245,7 @@ void Grid::update_E() {
         }
     }
 
-    pml_.update_E_psi(
+    pml().update_E_psi(
         Ex_ptr(), Ey_ptr(), Ez_ptr(),
         Hx_ptr(), Hy_ptr(), Hz_ptr(),
         Cb_x_ptr(), Cb_y_ptr(), Cb_z_ptr(),
@@ -310,13 +314,13 @@ double Grid::e_energy() const {
     double energy{};
     double const dV{ dx() * dy() * dz() };
 
-    double const* RESTRICT Ex{ Ex_ptr() };
-    double const* RESTRICT Ey{ Ey_ptr() };
-    double const* RESTRICT Ez{ Ez_ptr() };
+    double const* RESTRICT Ex{ Ex_ptr() }; ASSUME_ALIGNED(Ex, SIMD_BYTES);
+    double const* RESTRICT Ey{ Ey_ptr() }; ASSUME_ALIGNED(Ey, SIMD_BYTES);
+    double const* RESTRICT Ez{ Ez_ptr() }; ASSUME_ALIGNED(Ez, SIMD_BYTES);
 
-    double const* RESTRICT eps_x{ eps_x_ptr() };
-    double const* RESTRICT eps_y{ eps_y_ptr() };
-    double const* RESTRICT eps_z{ eps_z_ptr() };
+    double const* RESTRICT eps_x{ eps_x_ptr() }; ASSUME_ALIGNED(eps_x, SIMD_BYTES);
+    double const* RESTRICT eps_y{ eps_y_ptr() }; ASSUME_ALIGNED(eps_y, SIMD_BYTES);
+    double const* RESTRICT eps_z{ eps_z_ptr() }; ASSUME_ALIGNED(eps_z, SIMD_BYTES);
 
     std::size_t const Nx_local{ Nx() };
     std::size_t const Ny_local{ Ny() };
@@ -351,15 +355,15 @@ double Grid::e_energy() const {
 
 double Grid::h_energy() const {
     double energy{};
-    double const dV{ dx_ * dy_ * dz_ };
+    double const dV{ dx() * dy() * dz() };
 
-    double const* RESTRICT Hx{ Hx_ptr() };
-    double const* RESTRICT Hy{ Hy_ptr() };
-    double const* RESTRICT Hz{ Hz_ptr() };
+    double const* RESTRICT Hx{ Hx_ptr() }; ASSUME_ALIGNED(Hx, SIMD_BYTES);
+    double const* RESTRICT Hy{ Hy_ptr() }; ASSUME_ALIGNED(Hy, SIMD_BYTES);
+    double const* RESTRICT Hz{ Hz_ptr() }; ASSUME_ALIGNED(Hz, SIMD_BYTES);
 
-    double const* RESTRICT mu_x{ mu_x_ptr() };
-    double const* RESTRICT mu_y{ mu_y_ptr() };
-    double const* RESTRICT mu_z{ mu_z_ptr() };
+    double const* RESTRICT mu_x{ mu_x_ptr() }; ASSUME_ALIGNED(mu_x, SIMD_BYTES);
+    double const* RESTRICT mu_y{ mu_y_ptr() }; ASSUME_ALIGNED(mu_y, SIMD_BYTES);
+    double const* RESTRICT mu_z{ mu_z_ptr() }; ASSUME_ALIGNED(mu_z, SIMD_BYTES);
 
     std::size_t const Nx_local{ Nx() };
     std::size_t const Ny_local{ Ny() };

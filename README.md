@@ -41,9 +41,9 @@ The time step satisfies the CFL condition: $\Delta t \leq \frac{\alpha}{c \sqrt{
 
 - **Yee-grid leapfrog** with per-cell ε, μ, σ and precomputed Ca/Cb/Db coefficients via public `bake_coefficients()`
 - **CPML absorbing boundaries** with Roden–Gedney coefficients, per-axis σ_max for anisotropic grids, and material-correct ψ application using per-cell Cb/Db
-- **Monolithic `AlignedSoA<T>` memory** — 27 field/material/coefficient arrays in one SIMD-aligned contiguous block with compile-time width detection (AVX-512/AVX2/SSE2)
+- **Monolithic `AlignedSoA<T>` memory** - 27 field/material/coefficient arrays in one SIMD-aligned contiguous block with compile-time width detection (AVX-512/AVX2/SSE2)
 - **OpenMP parallelization** with `collapse(2)` outer loops, `#pragma omp simd` inner loops, `RESTRICT`/`ASSUME_ALIGNED` hints
-- **Four source types**: AC current loop, straight wire, point source, Gaussian pulse
+- **Four source types**: AC current loop, AC concentric rings, straight wire, point source, Gaussian pulse
 - **Double-buffered binary I/O** with persistent writer thread overlapping computation
 - **Plane wave validation** tracking energy drift, phase correlation, and numerical dispersion
 - **Rerun 3D visualization** with volume rendering, vector cones, and time-series energy plots

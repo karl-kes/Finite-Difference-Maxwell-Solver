@@ -11,9 +11,7 @@
 #include <numeric>
 #include <omp.h>
 
-// ============================================================================
 // Leapfrog Update Correctness
-// ============================================================================
 
 TEST(Integration, SingleStepCurlAnalytical) {
     // Place Ey=1 at center, step once, verify H at 4 grid points against
@@ -44,9 +42,7 @@ TEST(Integration, SingleStepCurlAnalytical) {
     ASSERT_NEAR( grid.field(Field::MAGNETIC, Component::Y, cx, cy, cz), 0.0, 1e-15 );
 }
 
-// ============================================================================
 // Plane Wave Propagation
-// ============================================================================
 
 TEST(Integration, PlaneWavePropagation) {
     Simulation_Config cfg{};
@@ -94,9 +90,7 @@ TEST(Integration, PlaneWavePropagation) {
     ASSERT_GT( correlation, 0.99 );
 }
 
-// ============================================================================
 // Energy Conservation
-// ============================================================================
 
 TEST(Integration, EnergyConservationNoPML) {
     // PML OFF (PEC cavity). Gaussian E-field blob. No dissipation mechanism.
@@ -135,9 +129,7 @@ TEST(Integration, EnergyConservationNoPML) {
     ASSERT_TRUE( std::isfinite( grid.total_energy() ) );
 }
 
-// ============================================================================
 // Divergence-Free (Gauss's Law)
-// ============================================================================
 
 TEST(Integration, GaussLawDivH) {
     Simulation_Config cfg{};
@@ -172,9 +164,7 @@ TEST(Integration, GaussLawDivH) {
     }
 }
 
-// ============================================================================
 // Symmetry
-// ============================================================================
 
 TEST(Integration, IsotropicSourceSymmetry) {
     // Gaussian Jz pulse: xy-plane symmetry. Actual asymmetries ~2.3%:
@@ -197,9 +187,7 @@ TEST(Integration, IsotropicSourceSymmetry) {
     ASSERT_LT( std::abs( E_py - E_px ) / E_avg, 0.10 );
 }
 
-// ============================================================================
 // PML
-// ============================================================================
 
 TEST(Integration, PMLAbsorbsVsPEC) {
     // Compare total energy after a Gaussian E-field blob has expanded and
@@ -312,9 +300,7 @@ TEST(Integration, LeapfrogEnergyConservation) {
     ASSERT_LT( growth_2, growth_1 * 1.5 );
 }
 
-// ============================================================================
 // Causality
-// ============================================================================
 
 TEST(Integration, CausalPropagation) {
     Simulation_Config cfg{};
@@ -325,9 +311,7 @@ TEST(Integration, CausalPropagation) {
     ASSERT_GT( std::abs( grid.Ey_ptr()[ grid.idx(51, 50, 50) ] ), 1e-20 );
 }
 
-// ============================================================================
 // Dispersion
-// ============================================================================
 
 TEST(Integration, DispersionConvergence) {
     Simulation_Config cfg{};
@@ -357,9 +341,7 @@ TEST(Integration, DispersionConvergence) {
     ASSERT_LT( dispersion_pct, 5.0 );
 }
 
-// ============================================================================
 // Hertzian Dipole
-// ============================================================================
 
 class Sinusoidal_Jz : public Source {
     double amplitude_, frequency_;
@@ -455,9 +437,7 @@ TEST(Integration, HertzianDipole1OverR) {
     ASSERT_LT( ratio_measured, ratio_expected * 1.05 );
 }
 
-// ============================================================================
 // Thread Determinism
-// ============================================================================
 
 struct ThreadTestResult { double energy; double field_sample; };
 
@@ -486,9 +466,7 @@ TEST(Integration, ThreadDeterminism) {
     omp_set_num_threads( max_threads );
 }
 
-// ============================================================================
 // Superposition
-// ============================================================================
 
 TEST(Integration, Superposition) {
     Simulation_Config cfg{};

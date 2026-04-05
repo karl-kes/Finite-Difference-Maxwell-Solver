@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ── Build modes ──────────────────────────────────────────────────────────────
+# Build modes:
 #
 #   Debug:   -O0, warnings, debug symbols, tests.    For catching bugs.
 #   Test:    -O3 -march=native etc., warnings, tests. Fast correctness check.
@@ -37,7 +37,7 @@ if(IS_DEBUG OR IS_TEST)
     set(BUILD_TESTS TRUE)
 endif()
 
-# ── Sanitizer detection ─────────────────────────────────────────────────────
+# Sanitizer detection:
 # ASan/UBSan are not available on MinGW. Only enable on Linux/macOS GCC/Clang.
 
 set(HAS_SANITIZERS FALSE)
@@ -45,7 +45,7 @@ if(IS_DEBUG AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MINGW)
     set(HAS_SANITIZERS TRUE)
 endif()
 
-# ── Core solver library (shared between main and tests) ──────────────────────
+# Core solver library (shared between main and tests):
 
 file(GLOB_RECURSE LIB_SOURCES
     src/Classes/Grid/*.cpp
@@ -59,7 +59,7 @@ add_library(fdtd_core STATIC ${LIB_SOURCES})
 
 target_include_directories(fdtd_core PUBLIC src)
 
-# ── Compiler flags ───────────────────────────────────────────────────────────
+# Compiler flags:
 
 set(HPC_OPT_FLAGS
     -O3
@@ -120,12 +120,12 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
 endif()
 
-# ── OpenMP ───────────────────────────────────────────────────────────────────
+# OpenMP:
 
 find_package(OpenMP REQUIRED)
 target_link_libraries(fdtd_core PUBLIC OpenMP::OpenMP_CXX)
 
-# ── IPO / Link-Time Optimization ────────────────────────────────────────────
+# IPO / Link-Time Optimization:
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT ipo_output)
@@ -133,7 +133,7 @@ if(ipo_supported AND NOT IS_DEBUG)
     set_property(TARGET fdtd_core PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
-# ── Main simulation executable ───────────────────────────────────────────────
+# Main simulation executable:
 
 file(GLOB_RECURSE SIM_SOURCES
     src/Classes/Simulation/*.cpp
@@ -146,7 +146,7 @@ if(ipo_supported AND NOT IS_DEBUG)
     set_property(TARGET main PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
-# ── Test suite ───────────────────────────────────────────────────────────────
+# Test suite:
 #
 #   Built in Debug and Test modes only. Excluded from Release.
 #
@@ -230,10 +230,19 @@ if(BUILD_TESTS)
     endif()
 endif()
 
-# ── Status ───────────────────────────────────────────────────────────────────
+# Status:
 
 message(STATUS "Build type:    ${CMAKE_BUILD_TYPE}")
 message(STATUS "Compiler:      ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "IPO/LTO:       ${ipo_supported}")
 message(STATUS "Tests:         ${BUILD_TESTS}")
 message(STATUS "Sanitizers:    ${HAS_SANITIZERS}")
+
+# Benchmark executable:
+
+add_executable(benchmark benchmark/benchmark.cpp)
+target_link_libraries(benchmark PRIVATE fdtd_core)
+
+if(ipo_supported AND NOT IS_DEBUG)
+    set_property(TARGET benchmark PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
