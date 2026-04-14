@@ -41,12 +41,6 @@ TEST(PML, CoefficientsInValidRange) {
         ASSERT_LT( pml.c_Ex_ptr()[i], 1e-15 );
         ASSERT_LT( pml.c_Hx_ptr()[i], 1e-15 );
     }
-
-    // kappa should be >= 1.0:
-    for ( std::size_t i = 0; i < pml.thickness(); ++i ) {
-        ASSERT_GT( pml.kappa_Ex_ptr()[i], 1.0 - 1e-10 );
-        ASSERT_GT( pml.kappa_Hx_ptr()[i], 1.0 - 1e-10 );
-    }
 }
 
 TEST(PML, GradingStrongerAtOuterEdge) {
@@ -55,21 +49,15 @@ TEST(PML, GradingStrongerAtOuterEdge) {
 
     std::size_t last = pml.thickness() - 1;
 
-    // Outermost kappa should equal kappa_max:
-    ASSERT_NEAR( pml.kappa_Ex_ptr()[0], cfg.pml_kappa_max, 1e-10 );
+    // b = exp(-(sigma + alpha) * dt / eps). Outer edge (i=0) has maximum
+    // sigma, so b is smallest there. Near the interior interface sigma -> 0
+    // but alpha -> alpha_max, so b plateaus below 1 and is not globally
+    // monotonic (alpha term can slightly dominate for the last few layers).
+    ASSERT_LT( pml.b_Ex_ptr()[0], pml.b_Ex_ptr()[last] );
+    ASSERT_LT( pml.b_Ex_ptr()[last], 1.0 );
+    ASSERT_GT( pml.b_Ex_ptr()[last], 0.0 );
 
-    // Outermost kappa should be >= innermost:
-    ASSERT_GT( pml.kappa_Ex_ptr()[0], pml.kappa_Ex_ptr()[last] - 1e-15 );
-
-    // Innermost kappa should be very close to 1.0 (actual: ~1.003):
-    ASSERT_NEAR( pml.kappa_Ex_ptr()[last], 1.0, 0.01 );
-
-    // Kappa monotonically non-increasing toward interface:
-    for ( std::size_t i = 1; i < pml.thickness(); ++i ) {
-        ASSERT_LT( pml.kappa_Ex_ptr()[i], pml.kappa_Ex_ptr()[i - 1] + 1e-15 );
-    }
-
-    // c coefficients less negative (weaker correction) toward interface:
+    // c is more negative (stronger correction) at the outer edge:
     ASSERT_LT( pml.c_Ex_ptr()[0], pml.c_Ex_ptr()[last] );
 }
 
@@ -84,8 +72,6 @@ TEST(PML, SymmetricAcrossDirections) {
         ASSERT_NEAR( pml.b_Ex_ptr()[i], pml.b_Ez_ptr()[i], 1e-15 );
         ASSERT_NEAR( pml.c_Ex_ptr()[i], pml.c_Ey_ptr()[i], 1e-15 );
         ASSERT_NEAR( pml.c_Ex_ptr()[i], pml.c_Ez_ptr()[i], 1e-15 );
-        ASSERT_NEAR( pml.kappa_Ex_ptr()[i], pml.kappa_Ey_ptr()[i], 1e-15 );
-        ASSERT_NEAR( pml.kappa_Ex_ptr()[i], pml.kappa_Ez_ptr()[i], 1e-15 );
     }
 }
 
@@ -98,8 +84,7 @@ TEST(PML, HalfIntegerShiftForHCoeffs) {
     for ( std::size_t i = 0; i < pml.thickness(); ++i ) {
         if ( i < pml.thickness() - 1 ) {
             double diff_b = std::abs( pml.b_Ex_ptr()[i] - pml.b_Hx_ptr()[i] );
-            double diff_k = std::abs( pml.kappa_Ex_ptr()[i] - pml.kappa_Hx_ptr()[i] );
-            ASSERT_GT( diff_b + diff_k, 1e-15 );
+            ASSERT_GT( diff_b, 1e-15 );
         }
     }
 }
@@ -137,10 +122,6 @@ TEST(PML, AnisotropicCoefficientsDistinct) {
     ASSERT_TRUE( std::abs( pml.b_Ex_ptr()[0] - pml.b_Ey_ptr()[0] ) > 1e-10 );
     ASSERT_TRUE( std::abs( pml.b_Ex_ptr()[0] - pml.b_Ez_ptr()[0] ) > 1e-10 );
     ASSERT_TRUE( std::abs( pml.c_Ex_ptr()[0] - pml.c_Ey_ptr()[0] ) > 1e-10 );
-
-    // Kappa should still be the same (only sigma is per-axis, not kappa):
-    ASSERT_NEAR( pml.kappa_Ex_ptr()[0], pml.kappa_Ey_ptr()[0], 1e-15 );
-    ASSERT_NEAR( pml.kappa_Ex_ptr()[0], pml.kappa_Ez_ptr()[0], 1e-15 );
 }
 
 TEST(PML, ThicknessClampedForSmallGrid) {

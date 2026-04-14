@@ -8,3 +8,4 @@ build
 build_debug
 build_release
 build_test
+benchmark/results

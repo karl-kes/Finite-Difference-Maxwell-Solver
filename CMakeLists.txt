@@ -199,7 +199,7 @@ if(BUILD_TESTS)
         set_property(TARGET run_tests PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     endif()
 
-    # CTest targets — one per suite for granular reporting:
+    # CTest targets - one per suite for granular reporting:
     add_test(NAME test_AlignedSoA       COMMAND run_tests AlignedSoA)
     add_test(NAME test_Grid             COMMAND run_tests Grid)
     add_test(NAME test_Source           COMMAND run_tests Source)
@@ -238,11 +238,61 @@ message(STATUS "IPO/LTO:       ${ipo_supported}")
 message(STATUS "Tests:         ${BUILD_TESTS}")
 message(STATUS "Sanitizers:    ${HAS_SANITIZERS}")
 
-# Benchmark executable:
+# Benchmark executable (OpenMP-enabled, default):
 
 add_executable(benchmark benchmark/benchmark.cpp)
 target_link_libraries(benchmark PRIVATE fdtd_core)
 
 if(ipo_supported AND NOT IS_DEBUG)
     set_property(TARGET benchmark PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
+# Serial-baseline benchmark: rebuilds the core WITHOUT -fopenmp so #pragma omp
+# directives compile to no-ops. Use this for the honest 1-thread baseline;
+# OMP-with-1-thread still pays parallel-region entry overhead.
+#
+# We set a preprocessor define so the core sources still compile cleanly
+# (the #pragma directives are ignored by the compiler when OpenMP is off,
+# but any direct omp_* API calls in fdtd_core would need to be guarded by
+# #ifdef _OPENMP; if you add any, wrap them accordingly).
+
+add_library(fdtd_core_serial STATIC ${LIB_SOURCES})
+target_include_directories(fdtd_core_serial PUBLIC src)
+
+if(MSVC)
+    if(IS_DEBUG)
+        target_compile_options(fdtd_core_serial PRIVATE /Od /Zi /W4)
+    elseif(HAS_SANITIZERS)
+        target_compile_options(fdtd_core_serial PRIVATE /O2 /GL /DNDEBUG /W4)
+        target_link_options(fdtd_core_serial PUBLIC /LTCG)
+    else()
+        target_compile_options(fdtd_core_serial PRIVATE /O2 /GL /DNDEBUG)
+        target_link_options(fdtd_core_serial PUBLIC /LTCG)
+    endif()
+else()
+    if(IS_DEBUG)
+        target_compile_options(fdtd_core_serial PRIVATE
+            -O0 -g -Wall -Wextra -Wpedantic)
+    elseif(HAS_SANITIZERS)
+        target_compile_options(fdtd_core_serial PRIVATE
+            -O3 -march=native -DNDEBUG -flto -Wall -Wextra)
+        target_link_options(fdtd_core_serial PUBLIC -flto)
+    else()
+        target_compile_options(fdtd_core_serial PRIVATE
+            -O3 -march=native -DNDEBUG -flto)
+        target_link_options(fdtd_core_serial PUBLIC -flto)
+    endif()
+endif()
+
+# Deliberately NO find_package(OpenMP) / no linkage to OpenMP::OpenMP_CXX here.
+
+if(ipo_supported AND NOT IS_DEBUG)
+    set_property(TARGET fdtd_core_serial PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
+add_executable(benchmark_serial benchmark/benchmark.cpp)
+target_link_libraries(benchmark_serial PRIVATE fdtd_core_serial)
+
+if(ipo_supported AND NOT IS_DEBUG)
+    set_property(TARGET benchmark_serial PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()

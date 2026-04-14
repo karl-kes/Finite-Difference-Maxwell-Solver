@@ -14,7 +14,6 @@ PML::PML( Simulation_Config const &config )
 , sigma_max_x_{ config.pml_sigma_max_x }
 , sigma_max_y_{ config.pml_sigma_max_y }
 , sigma_max_z_{ config.pml_sigma_max_z }
-, kappa_max_{ config.pml_kappa_max }
 , alpha_max_{ config.pml_alpha_max }
 , coeffs_{}
 , psi_{}
@@ -30,41 +29,32 @@ PML::PML( Simulation_Config const &config )
 
     double const d{ static_cast<double>( thickness() ) };
 
-    double* RESTRICT b_Ex{ b_Ex_ptr() }; double* RESTRICT c_Ex{ c_Ex_ptr() }; double* RESTRICT kappa_Ex{ kappa_Ex_ptr() };
-    double* RESTRICT b_Hx{ b_Hx_ptr() }; double* RESTRICT c_Hx{ c_Hx_ptr() }; double* RESTRICT kappa_Hx{ kappa_Hx_ptr() };
-    double* RESTRICT b_Ey{ b_Ey_ptr() }; double* RESTRICT c_Ey{ c_Ey_ptr() }; double* RESTRICT kappa_Ey{ kappa_Ey_ptr() };
-    double* RESTRICT b_Hy{ b_Hy_ptr() }; double* RESTRICT c_Hy{ c_Hy_ptr() }; double* RESTRICT kappa_Hy{ kappa_Hy_ptr() };
-    double* RESTRICT b_Ez{ b_Ez_ptr() }; double* RESTRICT c_Ez{ c_Ez_ptr() }; double* RESTRICT kappa_Ez{ kappa_Ez_ptr() };
-    double* RESTRICT b_Hz{ b_Hz_ptr() }; double* RESTRICT c_Hz{ c_Hz_ptr() }; double* RESTRICT kappa_Hz{ kappa_Hz_ptr() };
+    double* RESTRICT b_Ex{ b_Ex_ptr() }; double* RESTRICT c_Ex{ c_Ex_ptr() };
+    double* RESTRICT b_Hx{ b_Hx_ptr() }; double* RESTRICT c_Hx{ c_Hx_ptr() };
+    double* RESTRICT b_Ey{ b_Ey_ptr() }; double* RESTRICT c_Ey{ c_Ey_ptr() };
+    double* RESTRICT b_Hy{ b_Hy_ptr() }; double* RESTRICT c_Hy{ c_Hy_ptr() };
+    double* RESTRICT b_Ez{ b_Ez_ptr() }; double* RESTRICT c_Ez{ c_Ez_ptr() };
+    double* RESTRICT b_Hz{ b_Hz_ptr() }; double* RESTRICT c_Hz{ c_Hz_ptr() };
 
     std::size_t const t{ thickness() };
     for ( std::size_t i{ 0 }; i < t; ++i ) {
         double const depth_E{ ( d - static_cast<double>( i ) ) / d };
-        double const kap_E{ kappa( depth_E ) };
         double const alp_E{ alpha( depth_E ) };
 
         double const depth_H{ ( d - ( static_cast<double>( i ) + 0.5 ) ) / d };
-        double const depth_H_clamped{ std::max( depth_H, 0.0 ) };
-        double const kap_H{ kappa( depth_H_clamped ) };
-        double const alp_H{ alpha( depth_H_clamped ) };
+        double const alp_H{ alpha( depth_H ) };
 
         // x-axis coefficients:
-        compute_coefficients( sigma_x(depth_E), kap_E, alp_E, config.dt, config.eps, b_Ex[i], c_Ex[i] );
-        compute_coefficients( sigma_x(depth_H_clamped), kap_H, alp_H, config.dt, config.eps, b_Hx[i], c_Hx[i] );
-        kappa_Ex[i] = kap_E;
-        kappa_Hx[i] = kap_H;
+        compute_coefficients( sigma_x(depth_E), alp_E, config.dt, config.eps, b_Ex[i], c_Ex[i] );
+        compute_coefficients( sigma_x(depth_H), alp_H, config.dt, config.eps, b_Hx[i], c_Hx[i] );
 
         // y-axis coefficients:
-        compute_coefficients( sigma_y(depth_E), kap_E, alp_E, config.dt, config.eps, b_Ey[i], c_Ey[i] );
-        compute_coefficients( sigma_y(depth_H_clamped), kap_H, alp_H, config.dt, config.eps, b_Hy[i], c_Hy[i] );
-        kappa_Ey[i] = kap_E;
-        kappa_Hy[i] = kap_H;
+        compute_coefficients( sigma_y(depth_E), alp_E, config.dt, config.eps, b_Ey[i], c_Ey[i] );
+        compute_coefficients( sigma_y(depth_H), alp_H, config.dt, config.eps, b_Hy[i], c_Hy[i] );
 
         // z-axis coefficients:
-        compute_coefficients( sigma_z(depth_E), kap_E, alp_E, config.dt, config.eps, b_Ez[i], c_Ez[i] );
-        compute_coefficients( sigma_z(depth_H_clamped), kap_H, alp_H, config.dt, config.eps, b_Hz[i], c_Hz[i] );
-        kappa_Ez[i] = kap_E;
-        kappa_Hz[i] = kap_H;
+        compute_coefficients( sigma_z(depth_E), alp_E, config.dt, config.eps, b_Ez[i], c_Ez[i] );
+        compute_coefficients( sigma_z(depth_H), alp_H, config.dt, config.eps, b_Hz[i], c_Hz[i] );
     }
 }
 

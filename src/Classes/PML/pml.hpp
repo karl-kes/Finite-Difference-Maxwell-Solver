@@ -8,12 +8,12 @@
 #include <algorithm>
 
 enum CoeffArray : std::size_t {
-    B_EX_,  C_EX_,  KAPPA_EX_,
-    B_HX_,  C_HX_,  KAPPA_HX_,
-    B_EY_,  C_EY_,  KAPPA_EY_,
-    B_HY_,  C_HY_,  KAPPA_HY_,
-    B_EZ_,  C_EZ_,  KAPPA_EZ_,
-    B_HZ_,  C_HZ_,  KAPPA_HZ_,
+    B_EX_,  C_EX_,
+    B_HX_,  C_HX_,
+    B_EY_,  C_EY_,
+    B_HY_,  C_HY_,
+    B_EZ_,  C_EZ_,
+    B_HZ_,  C_HZ_,
     NUM_COEFF_ARRAYS_
 };
 
@@ -37,7 +37,6 @@ private:
     double sigma_max_x_;
     double sigma_max_y_;
     double sigma_max_z_;
-    double kappa_max_;
     double alpha_max_;
 
     AlignedSoA<double> coeffs_;
@@ -50,17 +49,17 @@ private:
     [[nodiscard]] double sigma_x( double const depth_norm ) const { return sigma_max_x_ * std::pow( depth_norm, order_ ); }
     [[nodiscard]] double sigma_y( double const depth_norm ) const { return sigma_max_y_ * std::pow( depth_norm, order_ ); }
     [[nodiscard]] double sigma_z( double const depth_norm ) const { return sigma_max_z_ * std::pow( depth_norm, order_ ); }
-    [[nodiscard]] double kappa( double const depth_norm ) const { return 1.0 + ( kappa_max_ - 1.0 ) * std::pow( depth_norm, order_ ); }
     [[nodiscard]] double alpha( double const depth_norm ) const { return alpha_max_ * ( 1.0 - depth_norm ); }
 
-    void compute_coefficients( 
-        double const sigma_val, double const kappa_val, double const alpha_val,
+    void compute_coefficients(
+        double const sigma_val, double const alpha_val,
         double const dt, double const eps,
         double &b_out, double &c_out
     ) const {
-        // Roden-Gedney CPML coefficients:
-        b_out = std::exp( -( sigma_val / kappa_val + alpha_val ) * dt / eps );
-        double const denom{ sigma_val + kappa_val * alpha_val };
+        // Roden-Gedney CPML coefficients with kappa = 1 (no coordinate
+        // stretching; this implementation is an absorbing layer only).
+        b_out = std::exp( -( sigma_val + alpha_val ) * dt / eps );
+        double const denom{ sigma_val + alpha_val };
         c_out = ( denom > 1e-20 ) ? ( sigma_val / denom ) * ( b_out - 1.0 ) : 0.0;
     }
 
@@ -98,51 +97,39 @@ public:
     // Per-layer PML coefficients (length = thickness):
     [[nodiscard]] double* b_Ex_ptr() { return coeffs_[B_EX_]; }
     [[nodiscard]] double* c_Ex_ptr() { return coeffs_[C_EX_]; }
-    [[nodiscard]] double* kappa_Ex_ptr() { return coeffs_[KAPPA_EX_]; }
 
     [[nodiscard]] double* b_Hx_ptr() { return coeffs_[B_HX_]; }
     [[nodiscard]] double* c_Hx_ptr() { return coeffs_[C_HX_]; }
-    [[nodiscard]] double* kappa_Hx_ptr() { return coeffs_[KAPPA_HX_]; }
 
     [[nodiscard]] double* b_Ey_ptr() { return coeffs_[B_EY_]; }
     [[nodiscard]] double* c_Ey_ptr() { return coeffs_[C_EY_]; }
-    [[nodiscard]] double* kappa_Ey_ptr() { return coeffs_[KAPPA_EY_]; }
 
     [[nodiscard]] double* b_Hy_ptr() { return coeffs_[B_HY_]; }
     [[nodiscard]] double* c_Hy_ptr() { return coeffs_[C_HY_]; }
-    [[nodiscard]] double* kappa_Hy_ptr() { return coeffs_[KAPPA_HY_]; }
 
     [[nodiscard]] double* b_Ez_ptr() { return coeffs_[B_EZ_]; }
     [[nodiscard]] double* c_Ez_ptr() { return coeffs_[C_EZ_]; }
-    [[nodiscard]] double* kappa_Ez_ptr() { return coeffs_[KAPPA_EZ_]; }
 
     [[nodiscard]] double* b_Hz_ptr() { return coeffs_[B_HZ_]; }
     [[nodiscard]] double* c_Hz_ptr() { return coeffs_[C_HZ_]; }
-    [[nodiscard]] double* kappa_Hz_ptr() { return coeffs_[KAPPA_HZ_]; }
 
     [[nodiscard]] double const* b_Ex_ptr() const { return coeffs_[B_EX_]; }
     [[nodiscard]] double const* c_Ex_ptr() const { return coeffs_[C_EX_]; }
-    [[nodiscard]] double const* kappa_Ex_ptr() const { return coeffs_[KAPPA_EX_]; }
 
     [[nodiscard]] double const* b_Hx_ptr() const { return coeffs_[B_HX_]; }
     [[nodiscard]] double const* c_Hx_ptr() const { return coeffs_[C_HX_]; }
-    [[nodiscard]] double const* kappa_Hx_ptr() const { return coeffs_[KAPPA_HX_]; }
 
     [[nodiscard]] double const* b_Ey_ptr() const { return coeffs_[B_EY_]; }
     [[nodiscard]] double const* c_Ey_ptr() const { return coeffs_[C_EY_]; }
-    [[nodiscard]] double const* kappa_Ey_ptr() const { return coeffs_[KAPPA_EY_]; }
 
     [[nodiscard]] double const* b_Hy_ptr() const { return coeffs_[B_HY_]; }
     [[nodiscard]] double const* c_Hy_ptr() const { return coeffs_[C_HY_]; }
-    [[nodiscard]] double const* kappa_Hy_ptr() const { return coeffs_[KAPPA_HY_]; }
 
     [[nodiscard]] double const* b_Ez_ptr() const { return coeffs_[B_EZ_]; }
     [[nodiscard]] double const* c_Ez_ptr() const { return coeffs_[C_EZ_]; }
-    [[nodiscard]] double const* kappa_Ez_ptr() const { return coeffs_[KAPPA_EZ_]; }
 
     [[nodiscard]] double const* b_Hz_ptr() const { return coeffs_[B_HZ_]; }
     [[nodiscard]] double const* c_Hz_ptr() const { return coeffs_[C_HZ_]; }
-    [[nodiscard]] double const* kappa_Hz_ptr() const { return coeffs_[KAPPA_HZ_]; }
 
     [[nodiscard]] double* psi_Eyx_ptr() { return psi_[PSI_EYX_]; }
     [[nodiscard]] double* psi_Ezx_ptr() { return psi_[PSI_EZX_]; }

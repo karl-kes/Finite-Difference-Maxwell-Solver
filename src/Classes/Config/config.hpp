@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 enum class Field {
     ELECTRIC,
@@ -41,7 +42,6 @@ public:
 
     bool use_pml{ true };
     int pml_order{ 3 };
-    double pml_kappa_max{ 15.0 };
     double pml_alpha_max{ 0.3 };
 
     // Derived (computed from above):
@@ -80,7 +80,6 @@ public:
         read( map, "run_validation", cfg.run_validation );
         read( map, "use_pml",     cfg.use_pml );
         read( map, "pml_order",   cfg.pml_order );
-        read( map, "pml_kappa_max", cfg.pml_kappa_max );
         read( map, "pml_alpha_max", cfg.pml_alpha_max );
 
         if ( !map.empty() ) {
@@ -97,6 +96,76 @@ public:
 
     [[nodiscard]] std::size_t output_interval() const {
         return 1;
+    }
+
+    // Apply CLI overrides. Argv is parsed for --<key> <value> pairs matching
+    // the config fields; anything unrecognized is left for main to handle or
+    // reject. Returns the list of overridden keys for logging. compute_derived
+    // is NOT called here; caller invokes it after all overrides land so
+    // derived quantities reflect the final state.
+    std::vector<std::string> apply_cli_overrides( int const argc, char const* const argv[] ) {
+        std::vector<std::string> applied{};
+
+        // Build a flat map of the flags this config understands.
+        // Values are lambdas that parse the next argv token into the field.
+        auto next_arg = [&]( int &i, std::string const &flag ) -> std::string {
+            if ( i + 1 >= argc ) {
+                throw std::invalid_argument{ "Missing value for " + flag };
+            }
+            return std::string{ argv[++i] };
+        };
+
+        for ( int i{ 1 }; i < argc; ++i ) {
+            std::string const arg{ argv[i] };
+
+            // Skip flags handled outside the config (e.g. --config, -h).
+            // main is responsible for consuming these before calling us.
+            if ( arg == "--config" ) { ++i; continue; }
+            if ( arg == "-h" || arg == "--help" ) { continue; }
+
+            if      ( arg == "--Nx" )             { Nx = std::stoull( next_arg( i, arg ) ); }
+            else if ( arg == "--Ny" )             { Ny = std::stoull( next_arg( i, arg ) ); }
+            else if ( arg == "--Nz" )             { Nz = std::stoull( next_arg( i, arg ) ); }
+            else if ( arg == "--dx" )             { dx = std::stod( next_arg( i, arg ) ); }
+            else if ( arg == "--dy" )             { dy = std::stod( next_arg( i, arg ) ); }
+            else if ( arg == "--dz" )             { dz = std::stod( next_arg( i, arg ) ); }
+            else if ( arg == "--mu" )             { mu = std::stod( next_arg( i, arg ) ); }
+            else if ( arg == "--eps" )            { eps = std::stod( next_arg( i, arg ) ); }
+            else if ( arg == "--cfl-factor" )     { cfl_factor = std::stod( next_arg( i, arg ) ); }
+            else if ( arg == "--total-steps" )    { total_steps = std::stoull( next_arg( i, arg ) ); }
+            else if ( arg == "--run-validation" ) { run_validation = parse_bool( next_arg( i, arg ) ); }
+            else if ( arg == "--no-validation" )  { run_validation = false; }
+            else if ( arg == "--use-pml" )        { use_pml = parse_bool( next_arg( i, arg ) ); }
+            else if ( arg == "--no-pml" )         { use_pml = false; }
+            else if ( arg == "--pml-order" )      { pml_order = std::stoi( next_arg( i, arg ) ); }
+            else if ( arg == "--pml-alpha-max" )  { pml_alpha_max = std::stod( next_arg( i, arg ) ); }
+            else {
+                throw std::invalid_argument{ "Unknown flag: " + arg };
+            }
+            applied.push_back( arg );
+        }
+        return applied;
+    }
+
+    static void print_cli_help( std::ostream &os ) {
+        os << "Usage: main [options]\n"
+           << "  --config PATH          Path to config.cfg (default: config.cfg).\n"
+           << "  --Nx N / --Ny N / --Nz N       Grid dimensions.\n"
+           << "  --dx V / --dy V / --dz V       Cell sizes.\n"
+           << "  --mu V                 Relative permeability.\n"
+           << "  --eps V                Relative permittivity.\n"
+           << "  --cfl-factor V         CFL factor (stability: <=1 in 3D, marginally).\n"
+           << "  --total-steps N        Number of timesteps.\n"
+           << "  --run-validation B     true/false/1/0.\n"
+           << "  --no-validation        Shorthand for --run-validation false.\n"
+           << "  --use-pml B            true/false/1/0.\n"
+           << "  --no-pml               Shorthand for --use-pml false.\n"
+           << "  --pml-order N          CPML polynomial order for sigma grading.\n"
+           << "  --pml-alpha-max V      CPML max alpha.\n"
+           << "  -h, --help             Show this help.\n"
+           << "\n"
+           << "CLI flags override values loaded from config.cfg. Derived quantities\n"
+           << "(dt, pml_thickness, pml_sigma_max_*) are recomputed after overrides.\n";
     }
 
     void compute_derived() {
@@ -189,11 +258,13 @@ private:
 
     static void read( Map &map, std::string const &key, bool &out ) {
         if ( auto it{ map.find( key ) }; it != map.end() ) {
-            std::string val{ it->second };
-            // Lowercase for comparison:
-            for ( auto &ch : val ) ch = static_cast<char>( std::tolower( ch ) );
-            out = ( val == "true" || val == "1" );
+            out = parse_bool( it->second );
             map.erase( it );
         }
+    }
+
+    [[nodiscard]] static bool parse_bool( std::string val ) {
+        for ( auto &ch : val ) ch = static_cast<char>( std::tolower( ch ) );
+        return ( val == "true" || val == "1" );
     }
 };
