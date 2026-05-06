@@ -264,17 +264,22 @@ void PML::update_E_psi(
     std::size_t const Sy{ Nx_padded() };
     std::size_t const Sz{ Nx_padded() * Ny_padded() };
 
+    // E-field interior runs over x in [1, Nx_local-2] (PEC at x=0, x=Nx_local-1).
+    // Each PML face spans the same depth on both sides so the strongest coefficient
+    // (b/c index 0) is applied at the cell adjacent to the boundary, matching the
+    // H-psi update structure. Low face: x in [1, d_max], coeff index = d.
+    // High face: x in [Nx_local-1-d_max, Nx_local-2], coeff index = d_max-1-d.
     std::size_t const d_max_lo_x{ std::min( t, Nx_local - 2 ) };
-    std::size_t const d_max_hi_x{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
-    std::size_t const x_hi_base{ Nx_local - t };
+    std::size_t const d_max_hi_x{ d_max_lo_x };
+    std::size_t const x_hi_base{ Nx_local - 1 - d_max_lo_x };
 
     std::size_t const d_max_lo_y{ std::min( t, Ny_local - 2 ) };
-    std::size_t const d_max_hi_y{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
-    std::size_t const y_hi_base{ Ny_local - t };
+    std::size_t const d_max_hi_y{ d_max_lo_y };
+    std::size_t const y_hi_base{ Ny_local - 1 - d_max_lo_y };
 
     std::size_t const d_max_lo_z{ std::min( t, Nz_local - 2 ) };
-    std::size_t const d_max_hi_z{ ( t >= 2 ) ? t - 1 : std::size_t{0} };
-    std::size_t const z_hi_base{ Nz_local - t };
+    std::size_t const d_max_hi_z{ d_max_lo_z };
+    std::size_t const z_hi_base{ Nz_local - 1 - d_max_lo_z };
 
     // x-faces
     #pragma omp parallel for collapse( 2 )
@@ -304,7 +309,7 @@ void PML::update_E_psi(
                 double const dHy{ ( Hy[gi] - Hy[gi - Sx] ) * inv_dx };
                 double const dHz{ ( Hz[gi] - Hz[gi - Sx] ) * inv_dx };
 
-                std::size_t const rd{ t - 1 - d };
+                std::size_t const rd{ d_max_hi_x - 1 - d };
 
                 pEyx[pi] = bEx[rd] * pEyx[pi] + cEx[rd] * dHy;
                 pEzx[pi] = bEx[rd] * pEzx[pi] + cEx[rd] * dHz;
@@ -343,7 +348,7 @@ void PML::update_E_psi(
                 double const dHx{ ( Hx[gi] - Hx[gi - Sy] ) * inv_dy };
                 double const dHz{ ( Hz[gi] - Hz[gi - Sy] ) * inv_dy };
 
-                std::size_t const rd{ t - 1 - d };
+                std::size_t const rd{ d_max_hi_y - 1 - d };
 
                 pExy[pi] = bEy[rd] * pExy[pi] + cEy[rd] * dHx;
                 pEzy[pi] = bEy[rd] * pEzy[pi] + cEy[rd] * dHz;
@@ -382,7 +387,7 @@ void PML::update_E_psi(
                 double const dHx{ ( Hx[gi] - Hx[gi - Sz] ) * inv_dz };
                 double const dHy{ ( Hy[gi] - Hy[gi - Sz] ) * inv_dz };
 
-                std::size_t const rd{ t - 1 - d };
+                std::size_t const rd{ d_max_hi_z - 1 - d };
 
                 pExz[pi] = bEz[rd] * pExz[pi] + cEz[rd] * dHx;
                 pEyz[pi] = bEz[rd] * pEyz[pi] + cEz[rd] * dHy;
