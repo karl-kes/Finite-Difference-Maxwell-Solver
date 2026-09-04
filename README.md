@@ -1,6 +1,8 @@
-# Finite-Difference Maxwell Solver
+# Kestrel
 
-A high-performance 3D FDTD solver for Maxwell's equations in C++ with OpenMP parallelization, Roden-Gedney PML absorbing boundaries, and Rerun-based 3D visualization.
+A C++23 framework in development for GPU-accelerated three-dimensional finite-difference solvers. Kestrel uses XPU for dual CPU/CUDA backends; HIP support is planned.
+
+The existing Maxwell FDTD solver now lives in `examples/maxwell` and serves as the first reference application while the generic Grid and Field APIs are developed.
 
 ![C++](https://img.shields.io/badge/C++-23-blue?logo=c%2B%2B)
 ![OpenMP](https://img.shields.io/badge/OpenMP-Parallel-green)
@@ -9,17 +11,17 @@ A high-performance 3D FDTD solver for Maxwell's equations in C++ with OpenMP par
 ## Demo
 
 ### Combined E & H Fields
-![EM Fields](assets/em-fields.gif)
+![EM Fields](examples/maxwell/assets/em-fields.gif)
 
 ### H-Field
-![H Field](assets/h-field.gif)
+![H Field](examples/maxwell/assets/h-field.gif)
 
 ### E-Field
-![E Field](assets/e-field.gif)
+![E Field](examples/maxwell/assets/e-field.gif)
 
 *AC current loop radiating electromagnetic waves, visualized with Rerun. E-field in viridis, H-field in inferno.*
 
-## Overview
+## Maxwell Example
 
 Implements the Yee algorithm on a staggered grid using leapfrog time-stepping in H-field formulation with per-cell material coefficients.
 
@@ -37,7 +39,7 @@ where $C_a = \frac{1 - \sigma\Delta t / 2\varepsilon}{1 + \sigma\Delta t / 2\var
 
 The time step satisfies the CFL condition: $\Delta t \leq \frac{\alpha}{c \sqrt{1/\Delta x^2 + 1/\Delta y^2 + 1/\Delta z^2}}$
 
-## Features
+### Features
 
 - **Yee-grid leapfrog** with per-cell ε, μ, σ and precomputed Ca/Cb/Db coefficients via public `bake_coefficients()`
 - **Roden-Gedney PML absorbing boundaries** (σ/α grading with κ = 1; no coordinate stretching), per-axis σ_max for anisotropic grids, and material-correct ψ application using per-cell Cb/Db
@@ -62,15 +64,20 @@ The time step satisfies the CFL condition: $\Delta t \leq \frac{\alpha}{c \sqrt{
 | NumPy | — | No | Visualization only |
 | Rerun SDK | — | No | Visualization only |
 
-## Build & Run
+## Build and Run
 
 ```bash
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15
-make -j
-./main
-python ../render.py  # optional visualization
+cmake -S . -B build-release \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_COMPILER=g++-15
+cmake --build build-release -j
+
+cd build-release/examples/maxwell
+./kestrel-maxwell
+python ../../../examples/maxwell/render.py  # optional visualization
 ```
+
+Set `KESTREL_BUILD_EXAMPLES=OFF` to configure Kestrel without its examples.
 
 ### Build Scripts
 
@@ -96,18 +103,20 @@ Linux / WSL2:
 ### Running Tests
 
 ```bash
-cmake .. -DCMAKE_BUILD_TYPE=Test -DCMAKE_CXX_COMPILER=g++-15
-make -j
-ctest --output-on-failure
+cmake -S . -B build-test \
+    -DCMAKE_BUILD_TYPE=Test \
+    -DCMAKE_CXX_COMPILER=g++-15
+cmake --build build-test --target kestrel-maxwell-tests -j
+ctest --test-dir build-test --output-on-failure
 
-# or run individual suites:
-./run-tests PML
-./run-tests Integration
+# or run individual Maxwell suites:
+./build-test/examples/maxwell/kestrel-maxwell-tests PML
+./build-test/examples/maxwell/kestrel-maxwell-tests Integration
 ```
 
 ## Configuration
 
-Parameters in `config.cfg` (key = value, `#` comments). Missing keys use compiled defaults; unknown keys warn.
+Parameters in `examples/maxwell/config.cfg` use `key = value` syntax. Missing keys use compiled defaults; unknown keys warn.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
@@ -125,33 +134,21 @@ Derived: `dt` (CFL-limited), `pml_thickness` (from grid volume, clamped to [4, 2
 
 ## Project Structure
 
+```text
+├── CMakeLists.txt                         # Shared toolchain, XPU, and backend setup
+├── examples/
+│   └── maxwell/
+│       ├── CMakeLists.txt                 # Maxwell targets
+│       ├── config.cfg                     # Runtime parameters
+│       ├── render.py                      # Rerun visualization
+│       ├── assets/                        # Demo media
+│       ├── benchmark/                     # Maxwell benchmark
+│       ├── src/                           # Existing Maxwell implementation
+│       │   ├── main.cu
+│       │   ├── utilities/
+│       │   └── classes/
+│       └── tests/                         # Existing Maxwell test suite
+└── scripts/                               # Linux and WSL2 workflows
 ```
-├── config.cfg                          # Runtime parameters
-├── CMakeLists.txt                      # Three-tier build system
-├── render.py                           # Rerun 3D visualization
-├── scripts/
-│   ├── build-debug.sh                   # Debug build
-│   ├── build-test.sh                    # Test build
-│   └── build-release.sh                 # Release build
-├── src/
-│   ├── main.cu                        # Entry point
-│   ├── utilities/
-│   │   ├── aligned-soa.hpp             # SIMD-aligned SoA allocator
-│   │   └── macros.hpp                  # RESTRICT, ASSUME_ALIGNED macros
-│   └── classes/
-│       ├── config/config.hpp           # Config parser & derived quantities
-│       ├── grid/grid.{hpp,cu}         # Field storage, Yee kernels, bake_coefficients
-│       ├── source/source.{hpp,cu}     # Source types (loop, wire, point, Gaussian)
-│       ├── pml/pml.{hpp,cu}           # PML coefficients & ψ updates
-│       ├── simulation/simulation.{hpp,cu}
-│       ├── write-output/output.{hpp,cu}
-│       └── validation/validation.{hpp,cu}
-├── tests/
-│   ├── test-framework.hpp              # Header-only test framework
-│   ├── test-aligned-soa.cu            # Allocation & alignment (7)
-│   ├── test-grid.cu                   # Grid, sources, config, lossy, H/E split (19)
-│   ├── test-pml.cu                    # Coefficients, anisotropic, clamping (9)
-│   ├── test-integration.cu            # Physics: conservation, causality, dipole, superposition (14)
-│   └── test-output-validation.cu      # I/O, validation, multi-axis PML reflection (6)
-└── output/                             # Generated data (gitignored)
-```
+
+The future framework API will live under `include/kestrel`; framework tests will be introduced alongside the Grid and Field abstractions.

@@ -2,16 +2,15 @@
 set -e
 
 # Build both benchmark binaries:
-#   - `benchmark`        : OpenMP-enabled, used for the multi-thread run and
-#                          the "1 thread OMP" column.
-#   - `benchmark-serial` : core rebuilt without -fopenmp; true serial baseline.
+#   - `kestrel-maxwell-benchmark`        : OpenMP-enabled.
+#   - `kestrel-maxwell-benchmark-serial` : core rebuilt without -fopenmp.
 mkdir -p build-release
 cd build-release
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15
-make -j"$(nproc)" benchmark benchmark-serial
+make -j"$(nproc)" kestrel-maxwell-benchmark kestrel-maxwell-benchmark-serial
 cd ..
 
-mkdir -p benchmark/results
+mkdir -p examples/maxwell/benchmark/results
 STAMP="$(date +%Y%m%d-%H%M%S)"
 HOST="$(hostname | tr -d '[:space:]')"
 TAG="${HOST}-${STAMP}"
@@ -24,13 +23,15 @@ export OMP_PROC_BIND="${OMP_PROC_BIND:-close}"
 
 echo ""
 echo "=== OpenMP benchmark (--threads = max) ==="
-./build-release/benchmark --output "benchmark/results/omp-${TAG}.csv" "$@"
+./build-release/examples/maxwell/kestrel-maxwell-benchmark \
+    --output "examples/maxwell/benchmark/results/omp-${TAG}.csv" "$@"
 
 echo ""
 echo "=== Serial benchmark (true single-thread, no -fopenmp) ==="
-./build-release/benchmark-serial --output "benchmark/results/serial-${TAG}.csv" "$@"
+./build-release/examples/maxwell/kestrel-maxwell-benchmark-serial \
+    --output "examples/maxwell/benchmark/results/serial-${TAG}.csv" "$@"
 
 echo ""
-echo "Results written to benchmark/results/"
-echo "  benchmark/results/omp-${TAG}.csv"
-echo "  benchmark/results/serial-${TAG}.csv"
+echo "Results written to examples/maxwell/benchmark/results/"
+echo "  examples/maxwell/benchmark/results/omp-${TAG}.csv"
+echo "  examples/maxwell/benchmark/results/serial-${TAG}.csv"

@@ -21,7 +21,7 @@
 
 // -----------------------------------------------------------------------------
 // Per-cell cost model (doubles, 8 bytes each). Derived from the kernels in
-// Grid::update_H and Grid::update_E at src/classes/grid/grid.cu.
+// Grid::update_H and Grid::update_E in the Maxwell source tree.
 //
 // Amortized bytes assume perfect neighbor reuse within a thread's tile
 // (each field value loaded once and reused by adjacent stencil points).
@@ -173,7 +173,7 @@ static double median_ms(
 // thread. This still pays parallel-region fork/barrier overhead (typically a
 // few percent). For a true serial compile, build this TU with -fno-openmp; the
 // _OPENMP macro then disappears, the #pragma omp directives are ignored, and
-// median_ms runs the kernels straight. The CMake target `benchmark-serial`
+// median_ms runs the kernels straight. The `kestrel-maxwell-benchmark-serial`
 // below exposes that.
 static double serial_baseline_ms(
     std::size_t const N,
@@ -408,7 +408,7 @@ int main( int argc, char* argv[] ) {
 
     std::cout << "Notes:\n";
     std::cout << "  - '1thr' = single-thread run. With _OPENMP defined, this is OMP pinned to 1 thread;\n";
-    std::cout << "    build `benchmark-serial` (no -fopenmp) for a true serial baseline.\n";
+    std::cout << "    build `kestrel-maxwell-benchmark-serial` (no -fopenmp) for a true serial baseline.\n";
     std::cout << "  - Mcells/s = (N^3 * steps) / wall_time.\n";
     std::cout << "  - GB/s* uses the AMORTIZED cost model (" << CostModel::bytes_amortized
               << " B/cell). Naive-model GB/s also in the CSV.\n";
