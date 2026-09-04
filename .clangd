@@ -1,0 +1,5 @@
+CompileFlags:
+  CompilationDatabase: build-clangd-cpp
+  Add:
+    - --gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/15
+    - -I/usr/lib/gcc/x86_64-linux-gnu/15/include

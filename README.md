@@ -9,13 +9,13 @@ A high-performance 3D FDTD solver for Maxwell's equations in C++ with OpenMP par
 ## Demo
 
 ### Combined E & H Fields
-![EM Fields](Assets/EM_Fields.gif)
+![EM Fields](assets/em-fields.gif)
 
 ### H-Field
-![H Field](Assets/H_Field.gif)
+![H Field](assets/h-field.gif)
 
 ### E-Field
-![E Field](Assets/E_Field.gif)
+![E Field](assets/e-field.gif)
 
 *AC current loop radiating electromagnetic waves, visualized with Rerun. E-field in viridis, H-field in inferno.*
 
@@ -53,8 +53,10 @@ The time step satisfies the CFL condition: $\Delta t \leq \frac{\alpha}{c \sqrt{
 
 | Dependency | Version | Required | Purpose |
 |-----------|---------|----------|---------|
-| C++ compiler (GCC recommended) | C++23 | Yes | Solver |
-| CMake | ≥ 3.20 | Yes | Build system |
+| Linux or WSL2 | — | Yes | Supported platform |
+| GCC | ≥ 15 | Yes | C++23 compiler |
+| CMake | ≥ 3.25 | Yes | Build system |
+| xpu | `main` | Yes | CPU/GPU portability layer |
 | OpenMP | — | Yes | Parallelization |
 | Python | ≥ 3.x | No | Visualization only |
 | NumPy | — | No | Visualization only |
@@ -64,24 +66,18 @@ The time step satisfies the CFL condition: $\Delta t \leq \frac{\alpha}{c \sqrt{
 
 ```bash
 mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++-15
 make -j
 ./main
 python ../render.py  # optional visualization
 ```
 
-Windows (MinGW):
-
-```bash
-cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-mingw32-make -j
-```
-
 ### Build Scripts
 
-The `scripts/` directory has per-mode scripts for both platforms. Each creates its build directory on first run and does incremental builds on subsequent runs.
+The Linux/WSL2 scripts create their build directories on first run and perform
+incremental builds on subsequent runs.
 
-Linux / macOS:
+Linux / WSL2:
 
 ```bash
 ./scripts/build-debug.sh
@@ -89,32 +85,24 @@ Linux / macOS:
 ./scripts/build-release.sh
 ```
 
-Windows (PowerShell / MinGW):
-
-```powershell
-.\scripts\build-debug.ps1
-.\scripts\build-test.ps1
-.\scripts\build-release.ps1
-```
-
 ### Build Modes
 
 | Mode | Flags | Tests | Use Case |
 |------|-------|-------|----------|
-| Debug | `-O0 -g3`, ASan+UBSan (Linux/macOS) | Yes | Bug hunting |
+| Debug | `-O0 -g3`, ASan+UBSan | Yes | Bug hunting |
 | Test | `-O3 -march=native` (lib), `-O2` (tests, no `-ffast-math`) | Yes | Correctness |
 | Release | `-O3 -march=native -ffast-math -flto` | No | Benchmarking |
 
 ### Running Tests
 
 ```bash
-cmake .. -DCMAKE_BUILD_TYPE=Test
+cmake .. -DCMAKE_BUILD_TYPE=Test -DCMAKE_CXX_COMPILER=g++-15
 make -j
 ctest --output-on-failure
 
 # or run individual suites:
-./run_tests PML
-./run_tests Integration
+./run-tests PML
+./run-tests Integration
 ```
 
 ## Configuration
@@ -142,28 +130,28 @@ Derived: `dt` (CFL-limited), `pml_thickness` (from grid volume, clamped to [4, 2
 ├── CMakeLists.txt                      # Three-tier build system
 ├── render.py                           # Rerun 3D visualization
 ├── scripts/
-│   ├── build-debug.{sh,ps1}            # Debug build
-│   ├── build-test.{sh,ps1}             # Test build
-│   └── build-release.{sh,ps1}          # Release build
+│   ├── build-debug.sh                   # Debug build
+│   ├── build-test.sh                    # Test build
+│   └── build-release.sh                 # Release build
 ├── src/
-│   ├── main.cpp                        # Entry point
-│   ├── Utilities/
-│   │   ├── aligned_soa.hpp             # SIMD-aligned SoA allocator
+│   ├── main.cu                        # Entry point
+│   ├── utilities/
+│   │   ├── aligned-soa.hpp             # SIMD-aligned SoA allocator
 │   │   └── macros.hpp                  # RESTRICT, ASSUME_ALIGNED macros
-│   └── Classes/
-│       ├── Config/config.hpp           # Config parser & derived quantities
-│       ├── Grid/grid.{hpp,cpp}         # Field storage, Yee kernels, bake_coefficients
-│       ├── Source/source.{hpp,cpp}     # Source types (loop, wire, point, Gaussian)
-│       ├── PML/pml.{hpp,cpp}           # PML coefficients & ψ updates
-│       ├── Simulation/simulation.{hpp,cpp}
-│       ├── Write_Output/output.{hpp,cpp}
-│       └── Validation/validation.{hpp,cpp}
+│   └── classes/
+│       ├── config/config.hpp           # Config parser & derived quantities
+│       ├── grid/grid.{hpp,cu}         # Field storage, Yee kernels, bake_coefficients
+│       ├── source/source.{hpp,cu}     # Source types (loop, wire, point, Gaussian)
+│       ├── pml/pml.{hpp,cu}           # PML coefficients & ψ updates
+│       ├── simulation/simulation.{hpp,cu}
+│       ├── write-output/output.{hpp,cu}
+│       └── validation/validation.{hpp,cu}
 ├── tests/
-│   ├── test_framework.hpp              # Header-only test framework
-│   ├── test_aligned_soa.cpp            # Allocation & alignment (7)
-│   ├── test_grid.cpp                   # Grid, sources, config, lossy, H/E split (19)
-│   ├── test_pml.cpp                    # Coefficients, anisotropic, clamping (9)
-│   ├── test_integration.cpp            # Physics: conservation, causality, dipole, superposition (14)
-│   └── test_output_validation.cpp      # I/O, validation, multi-axis PML reflection (6)
+│   ├── test-framework.hpp              # Header-only test framework
+│   ├── test-aligned-soa.cu            # Allocation & alignment (7)
+│   ├── test-grid.cu                   # Grid, sources, config, lossy, H/E split (19)
+│   ├── test-pml.cu                    # Coefficients, anisotropic, clamping (9)
+│   ├── test-integration.cu            # Physics: conservation, causality, dipole, superposition (14)
+│   └── test-output-validation.cu      # I/O, validation, multi-axis PML reflection (6)
 └── output/                             # Generated data (gitignored)
 ```

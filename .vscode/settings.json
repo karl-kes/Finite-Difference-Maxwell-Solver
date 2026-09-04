@@ -1,0 +1,26 @@
+{
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "clangd.arguments": [
+    "--compile-commands-dir=${workspaceFolder}/build-clangd-cpp",
+    "--background-index",
+    "--clang-tidy",
+    "--completion-style=detailed",
+    "--header-insertion=iwyu",
+    "--query-driver=/usr/bin/g++-15,/usr/local/cuda-*/bin/nvcc"
+  ],
+  "terminal.integrated.env.linux": {
+    "PATH": "${env:PATH}:/usr/local/cuda/bin"
+  },
+  "cmake.generator": "Ninja",
+  "cmake.buildDirectory": "${workspaceFolder}/build-clangd-cpp",
+  "cmake.configureOnOpen": true,
+  "cmake.configureSettings": {
+    "CMAKE_CXX_COMPILER": "/usr/bin/g++-15",
+    "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+    "FETCHCONTENT_SOURCE_DIR_XPU": "${workspaceFolder}/../xpu",
+    "KESTREL_ENABLE_CUDA": false,
+    "XPU_ENABLE_CUDA": false,
+    "XPU_ENABLE_LINALG": false,
+    "XPU_BUILD_TESTS": false
+  }
+}

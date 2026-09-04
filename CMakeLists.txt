@@ -1,15 +1,83 @@
-cmake_minimum_required(VERSION 3.20)
-project(HPCSim LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.25)
+project(kestrel LANGUAGES CXX)
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "Kestrel supports Linux and WSL2 only.")
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Toolchain requirements:
+
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(FATAL_ERROR
+        "Kestrel requires GCC 15 or newer (found ${CMAKE_CXX_COMPILER_ID}). "
+        "Configure with -DCMAKE_CXX_COMPILER=g++-15.")
+endif()
+
+if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
+    message(FATAL_ERROR
+        "Kestrel requires GCC 15 or newer (found ${CMAKE_CXX_COMPILER_VERSION}). "
+        "Configure with -DCMAKE_CXX_COMPILER=g++-15.")
+endif()
+
+# CUDA backend:
+option(KESTREL_ENABLE_CUDA "Enable CUDA when a CUDA compiler is available" ON)
+
+set(KESTREL_CUDA FALSE)
+if(KESTREL_ENABLE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+
+    if(CMAKE_CUDA_COMPILER)
+        if(NOT CMAKE_CUDA_HOST_COMPILER)
+            set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}")
+        endif()
+
+        # CUDA 13.3 supports C++23 even when CMake has not learned its flag.
+        set(CMAKE_CUDA23_STANDARD_COMPILE_OPTION "-std=c++23")
+        set(CMAKE_CUDA23_EXTENSION_COMPILE_OPTION "-std=c++23")
+        enable_language(CUDA)
+
+        if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+            set(CMAKE_CUDA_ARCHITECTURES native)
+        endif()
+
+        set(KESTREL_CUDA TRUE)
+    else()
+        message(STATUS "Kestrel: no CUDA compiler found; using the CPU backend")
+    endif()
+endif()
+
+# xpu:
+include(FetchContent)
+
+set(XPU_ENABLE_CUDA ${KESTREL_CUDA} CACHE BOOL "" FORCE)
+set(XPU_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
+fetchcontent_declare(
+    xpu
+    GIT_REPOSITORY https://github.com/UWHPC/xpu.git
+    GIT_TAG main
+    GIT_SHALLOW TRUE
+)
+fetchcontent_makeavailable(xpu)
+
+function(kestrel_configure_sources)
+    if(NOT KESTREL_CUDA)
+        set_source_files_properties(
+            ${ARGN}
+            PROPERTIES
+                LANGUAGE CXX
+                COMPILE_OPTIONS "-x;c++"
+        )
+    endif()
+endfunction()
+
 # Build modes:
-#
-#   Debug:   -O0, warnings, debug symbols, tests.    For catching bugs.
-#   Test:    -O3 -march=native etc., warnings, tests. Fast correctness check.
-#   Release: -O3 -march=native etc., no warnings, no tests.  Ship/benchmark.
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -37,27 +105,27 @@ if(IS_DEBUG OR IS_TEST)
     set(BUILD_TESTS TRUE)
 endif()
 
-# Sanitizer detection:
-# ASan/UBSan are not available on MinGW. Only enable on Linux/macOS GCC/Clang.
-
+# Sanitizers are enabled for CPU Debug builds.
 set(HAS_SANITIZERS FALSE)
-if(IS_DEBUG AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MINGW)
+if(IS_DEBUG AND NOT KESTREL_CUDA)
     set(HAS_SANITIZERS TRUE)
 endif()
 
 # Core solver library (shared between main and tests):
 
 file(GLOB_RECURSE LIB_SOURCES
-    src/Classes/Grid/*.cpp
-    src/Classes/Source/*.cpp
-    src/Classes/PML/*.cpp
-    src/Classes/Write_Output/*.cpp
-    src/Classes/Validation/*.cpp
+    src/classes/grid/*.cu
+    src/classes/source/*.cu
+    src/classes/pml/*.cu
+    src/classes/write-output/*.cu
+    src/classes/validation/*.cu
 )
+kestrel_configure_sources(${LIB_SOURCES})
 
-add_library(fdtd_core STATIC ${LIB_SOURCES})
+add_library(fdtd-core STATIC ${LIB_SOURCES})
 
-target_include_directories(fdtd_core PUBLIC src)
+target_include_directories(fdtd-core PUBLIC src)
+target_link_libraries(fdtd-core PUBLIC xpu::xpu)
 
 # Compiler flags:
 
@@ -79,154 +147,157 @@ set(WARN_FLAGS
     -Wconversion
 )
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-
-    if(IS_DEBUG)
-        target_compile_options(fdtd_core PRIVATE
+if(IS_DEBUG)
+    if(KESTREL_CUDA)
+        target_compile_options(fdtd-core PRIVATE
+            -O0 -g
+            -Xcompiler=-Wall,-Wextra,-Wshadow,-Wconversion,-fno-omit-frame-pointer
+        )
+    else()
+        target_compile_options(fdtd-core PRIVATE
             -O0 -g3
             ${WARN_FLAGS}
             -fno-omit-frame-pointer
+            -fsanitize=address,undefined
         )
-        if(HAS_SANITIZERS)
-            target_compile_options(fdtd_core PRIVATE -fsanitize=address,undefined)
-            target_link_options(fdtd_core PUBLIC -fsanitize=address,undefined)
-        endif()
-
-    elseif(IS_TEST)
-        target_compile_options(fdtd_core PRIVATE
+        target_link_options(fdtd-core PUBLIC -fsanitize=address,undefined)
+    endif()
+elseif(IS_TEST)
+    if(KESTREL_CUDA)
+        target_compile_options(fdtd-core PRIVATE
+            -O3
+            -Xcompiler=-O3,-march=native,-mtune=native,-funroll-loops,-ffast-math,-DNDEBUG
+            -Xcompiler=-Wall,-Wextra,-Wshadow,-Wconversion
+        )
+    else()
+        target_compile_options(fdtd-core PRIVATE
             ${HPC_OPT_FLAGS}
             ${WARN_FLAGS}
         )
-        target_link_options(fdtd_core PUBLIC -flto)
-
-    elseif(IS_RELEASE)
-        target_compile_options(fdtd_core PRIVATE
+        target_link_options(fdtd-core PUBLIC -flto)
+    endif()
+elseif(IS_RELEASE)
+    if(KESTREL_CUDA)
+        target_compile_options(fdtd-core PRIVATE
+            -O3
+            -Xcompiler=-O3,-march=native,-mtune=native,-funroll-loops,-ffast-math,-DNDEBUG
+        )
+    else()
+        target_compile_options(fdtd-core PRIVATE
             ${HPC_OPT_FLAGS}
         )
-        target_link_options(fdtd_core PUBLIC -flto)
+        target_link_options(fdtd-core PUBLIC -flto)
     endif()
-
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-
-    if(IS_DEBUG)
-        target_compile_options(fdtd_core PRIVATE /Od /Zi /W4)
-    elseif(IS_TEST)
-        target_compile_options(fdtd_core PRIVATE /O2 /GL /DNDEBUG /W4)
-        target_link_options(fdtd_core PUBLIC /LTCG)
-    elseif(IS_RELEASE)
-        target_compile_options(fdtd_core PRIVATE /O2 /GL /DNDEBUG)
-        target_link_options(fdtd_core PUBLIC /LTCG)
-    endif()
-
 endif()
 
 # OpenMP:
 
-find_package(OpenMP REQUIRED)
-target_link_libraries(fdtd_core PUBLIC OpenMP::OpenMP_CXX)
+find_package(OpenMP REQUIRED COMPONENTS CXX)
+target_link_libraries(fdtd-core PUBLIC OpenMP::OpenMP_CXX)
+target_compile_options(fdtd-core PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>
+)
 
 # IPO / Link-Time Optimization:
 
 include(CheckIPOSupported)
-check_ipo_supported(RESULT ipo_supported OUTPUT ipo_output)
-if(ipo_supported AND NOT IS_DEBUG)
-    set_property(TARGET fdtd_core PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_output LANGUAGES CXX)
+if(ipo_supported AND NOT IS_DEBUG AND NOT KESTREL_CUDA)
+    set_property(TARGET fdtd-core PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 # Main simulation executable:
 
 file(GLOB_RECURSE SIM_SOURCES
-    src/Classes/Simulation/*.cpp
+    src/classes/simulation/*.cu
 )
+kestrel_configure_sources(src/main.cu ${SIM_SOURCES})
 
-add_executable(main src/main.cpp ${SIM_SOURCES})
-target_link_libraries(main PRIVATE fdtd_core)
+add_executable(main src/main.cu ${SIM_SOURCES})
+target_link_libraries(main PRIVATE fdtd-core)
 
-if(ipo_supported AND NOT IS_DEBUG)
+if(ipo_supported AND NOT IS_DEBUG AND NOT KESTREL_CUDA)
     set_property(TARGET main PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 # Test suite:
-#
-#   Built in Debug and Test modes only. Excluded from Release.
-#
-#   Test:  -O2 -march=native + warnings (no -ffast-math so validation
-#          floating-point comparisons aren't perturbed by reordering).
-#
-#   Debug: -O1 + warnings (+ sanitizers on Linux/macOS only).
-#          -O1 not -O0 because integration tests step a 101^3 grid hundreds
-#          of times — -O0 would take minutes.
 
 enable_testing()
 
 if(BUILD_TESTS)
 
-    file(GLOB TEST_SOURCES tests/test_*.cpp)
+    file(GLOB TEST_SOURCES tests/test-*.cu)
+    kestrel_configure_sources(${TEST_SOURCES})
 
-    add_executable(run_tests ${TEST_SOURCES})
+    add_executable(run-tests ${TEST_SOURCES})
 
-    target_include_directories(run_tests PRIVATE tests)
-    target_link_libraries(run_tests PRIVATE fdtd_core)
+    target_include_directories(run-tests PRIVATE tests)
+    target_link_libraries(run-tests PRIVATE fdtd-core)
 
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        if(IS_DEBUG)
-            target_compile_options(run_tests PRIVATE
+    if(IS_DEBUG)
+        if(KESTREL_CUDA)
+            target_compile_options(run-tests PRIVATE
+                -O1 -g
+                -Xcompiler=-Wall,-Wextra,-Wshadow,-Wconversion,-fno-omit-frame-pointer
+            )
+        else()
+            target_compile_options(run-tests PRIVATE
                 -O1 -g3
                 ${WARN_FLAGS}
                 -fno-omit-frame-pointer
+                -fsanitize=address,undefined
             )
-            if(HAS_SANITIZERS)
-                target_compile_options(run_tests PRIVATE -fsanitize=address,undefined)
-                target_link_options(run_tests PRIVATE -fsanitize=address,undefined)
-            endif()
-        elseif(IS_TEST)
-            target_compile_options(run_tests PRIVATE
+            target_link_options(run-tests PRIVATE -fsanitize=address,undefined)
+        endif()
+    elseif(IS_TEST)
+        if(KESTREL_CUDA)
+            target_compile_options(run-tests PRIVATE
+                -O2
+                -Xcompiler=-O2,-march=native,-DNDEBUG
+                -Xcompiler=-Wall,-Wextra,-Wshadow,-Wconversion
+            )
+        else()
+            target_compile_options(run-tests PRIVATE
                 -O2
                 -march=native
                 -DNDEBUG
                 ${WARN_FLAGS}
             )
         endif()
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-        if(IS_DEBUG)
-            target_compile_options(run_tests PRIVATE /Od /Zi /W4)
-        elseif(IS_TEST)
-            target_compile_options(run_tests PRIVATE /O2 /DNDEBUG /W4)
-        endif()
     endif()
 
-    if(ipo_supported AND IS_TEST)
-        set_property(TARGET run_tests PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    if(ipo_supported AND IS_TEST AND NOT KESTREL_CUDA)
+        set_property(TARGET run-tests PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     endif()
 
     # CTest targets - one per suite for granular reporting:
-    add_test(NAME test_AlignedSoA       COMMAND run_tests AlignedSoA)
-    add_test(NAME test_Grid             COMMAND run_tests Grid)
-    add_test(NAME test_Source           COMMAND run_tests Source)
-    add_test(NAME test_PML             COMMAND run_tests PML)
-    add_test(NAME test_Integration      COMMAND run_tests Integration)
-    add_test(NAME test_Output           COMMAND run_tests Output)
-    add_test(NAME test_ValidationClass  COMMAND run_tests ValidationClass)
-    add_test(NAME test_AllTests         COMMAND run_tests)
+    add_test(NAME aligned-soa      COMMAND run-tests AlignedSoA)
+    add_test(NAME grid             COMMAND run-tests Grid)
+    add_test(NAME source           COMMAND run-tests Source)
+    add_test(NAME pml              COMMAND run-tests PML)
+    add_test(NAME integration      COMMAND run-tests Integration)
+    add_test(NAME output           COMMAND run-tests Output)
+    add_test(NAME validation-class COMMAND run-tests ValidationClass)
+    add_test(NAME all-tests        COMMAND run-tests)
 
     if(IS_DEBUG)
-        set_tests_properties(test_AlignedSoA PROPERTIES TIMEOUT 60)
-        set_tests_properties(test_Grid       PROPERTIES TIMEOUT 60)
-        set_tests_properties(test_Source     PROPERTIES TIMEOUT 60)
-        set_tests_properties(test_Output     PROPERTIES TIMEOUT 60)
-        set_tests_properties(test_PML             PROPERTIES TIMEOUT 300)
-        set_tests_properties(test_Integration     PROPERTIES TIMEOUT 600)
-        set_tests_properties(test_ValidationClass PROPERTIES TIMEOUT 300)
-        set_tests_properties(test_AllTests        PROPERTIES TIMEOUT 600)
+        set_tests_properties(aligned-soa      PROPERTIES TIMEOUT 60)
+        set_tests_properties(grid             PROPERTIES TIMEOUT 60)
+        set_tests_properties(source           PROPERTIES TIMEOUT 60)
+        set_tests_properties(output           PROPERTIES TIMEOUT 60)
+        set_tests_properties(pml              PROPERTIES TIMEOUT 300)
+        set_tests_properties(integration      PROPERTIES TIMEOUT 600)
+        set_tests_properties(validation-class PROPERTIES TIMEOUT 300)
+        set_tests_properties(all-tests        PROPERTIES TIMEOUT 600)
     else()
-        set_tests_properties(test_AlignedSoA PROPERTIES TIMEOUT 30)
-        set_tests_properties(test_Grid       PROPERTIES TIMEOUT 30)
-        set_tests_properties(test_Source     PROPERTIES TIMEOUT 30)
-        set_tests_properties(test_Output     PROPERTIES TIMEOUT 30)
-        set_tests_properties(test_PML             PROPERTIES TIMEOUT 30)
-        set_tests_properties(test_Integration     PROPERTIES TIMEOUT 300)
-        set_tests_properties(test_ValidationClass PROPERTIES TIMEOUT 120)
-        set_tests_properties(test_AllTests        PROPERTIES TIMEOUT 300)
+        set_tests_properties(aligned-soa      PROPERTIES TIMEOUT 30)
+        set_tests_properties(grid             PROPERTIES TIMEOUT 30)
+        set_tests_properties(source           PROPERTIES TIMEOUT 30)
+        set_tests_properties(output           PROPERTIES TIMEOUT 30)
+        set_tests_properties(pml              PROPERTIES TIMEOUT 120)
+        set_tests_properties(integration      PROPERTIES TIMEOUT 300)
+        set_tests_properties(validation-class PROPERTIES TIMEOUT 120)
+        set_tests_properties(all-tests        PROPERTIES TIMEOUT 300)
     endif()
 endif()
 
@@ -237,62 +308,55 @@ message(STATUS "Compiler:      ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VER
 message(STATUS "IPO/LTO:       ${ipo_supported}")
 message(STATUS "Tests:         ${BUILD_TESTS}")
 message(STATUS "Sanitizers:    ${HAS_SANITIZERS}")
+if(KESTREL_CUDA)
+    message(STATUS "xpu backend:   CUDA")
+else()
+    message(STATUS "xpu backend:   CPU")
+endif()
 
 # Benchmark executable (OpenMP-enabled, default):
 
-add_executable(benchmark benchmark/benchmark.cpp)
-target_link_libraries(benchmark PRIVATE fdtd_core)
+kestrel_configure_sources(benchmark/benchmark.cu)
 
-if(ipo_supported AND NOT IS_DEBUG)
+add_executable(benchmark benchmark/benchmark.cu)
+target_link_libraries(benchmark PRIVATE fdtd-core)
+
+if(ipo_supported AND NOT IS_DEBUG AND NOT KESTREL_CUDA)
     set_property(TARGET benchmark PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
-# Serial-baseline benchmark: rebuilds the core WITHOUT -fopenmp so #pragma omp
-# directives compile to no-ops. Use this for the honest 1-thread baseline;
-# OMP-with-1-thread still pays parallel-region entry overhead.
-#
-# We set a preprocessor define so the core sources still compile cleanly
-# (the #pragma directives are ignored by the compiler when OpenMP is off,
-# but any direct omp_* API calls in fdtd_core would need to be guarded by
-# #ifdef _OPENMP; if you add any, wrap them accordingly).
+add_library(fdtd-core-serial STATIC ${LIB_SOURCES})
+target_include_directories(fdtd-core-serial PUBLIC src)
+target_link_libraries(fdtd-core-serial PUBLIC xpu::xpu)
 
-add_library(fdtd_core_serial STATIC ${LIB_SOURCES})
-target_include_directories(fdtd_core_serial PUBLIC src)
-
-if(MSVC)
-    if(IS_DEBUG)
-        target_compile_options(fdtd_core_serial PRIVATE /Od /Zi /W4)
-    elseif(HAS_SANITIZERS)
-        target_compile_options(fdtd_core_serial PRIVATE /O2 /GL /DNDEBUG /W4)
-        target_link_options(fdtd_core_serial PUBLIC /LTCG)
+if(IS_DEBUG)
+    if(KESTREL_CUDA)
+        target_compile_options(fdtd-core-serial PRIVATE
+            -O0 -g -Xcompiler=-Wall,-Wextra)
     else()
-        target_compile_options(fdtd_core_serial PRIVATE /O2 /GL /DNDEBUG)
-        target_link_options(fdtd_core_serial PUBLIC /LTCG)
+        target_compile_options(fdtd-core-serial PRIVATE
+            -O0 -g -Wall -Wextra -Wpedantic)
     endif()
 else()
-    if(IS_DEBUG)
-        target_compile_options(fdtd_core_serial PRIVATE
-            -O0 -g -Wall -Wextra -Wpedantic)
-    elseif(HAS_SANITIZERS)
-        target_compile_options(fdtd_core_serial PRIVATE
-            -O3 -march=native -DNDEBUG -flto -Wall -Wextra)
-        target_link_options(fdtd_core_serial PUBLIC -flto)
+    if(KESTREL_CUDA)
+        target_compile_options(fdtd-core-serial PRIVATE
+            -O3 -Xcompiler=-O3,-march=native,-DNDEBUG)
     else()
-        target_compile_options(fdtd_core_serial PRIVATE
+        target_compile_options(fdtd-core-serial PRIVATE
             -O3 -march=native -DNDEBUG -flto)
-        target_link_options(fdtd_core_serial PUBLIC -flto)
+        target_link_options(fdtd-core-serial PUBLIC -flto)
     endif()
 endif()
 
 # Deliberately NO find_package(OpenMP) / no linkage to OpenMP::OpenMP_CXX here.
 
-if(ipo_supported AND NOT IS_DEBUG)
-    set_property(TARGET fdtd_core_serial PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+if(ipo_supported AND NOT IS_DEBUG AND NOT KESTREL_CUDA)
+    set_property(TARGET fdtd-core-serial PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
-add_executable(benchmark_serial benchmark/benchmark.cpp)
-target_link_libraries(benchmark_serial PRIVATE fdtd_core_serial)
+add_executable(benchmark-serial benchmark/benchmark.cu)
+target_link_libraries(benchmark-serial PRIVATE fdtd-core-serial)
 
-if(ipo_supported AND NOT IS_DEBUG)
-    set_property(TARGET benchmark_serial PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+if(ipo_supported AND NOT IS_DEBUG AND NOT KESTREL_CUDA)
+    set_property(TARGET benchmark-serial PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()

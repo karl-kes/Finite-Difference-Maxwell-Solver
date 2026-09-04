@@ -47,16 +47,16 @@ h_radius_min   = 0.10
 h_radius_max   = 0.25
 
 # File paths:
-e_path = "output/E.bin"
-h_path = "output/H.bin"
+e_path = "output/e.bin"
+h_path = "output/h.bin"
 
-assert os.path.exists(e_path), "E.bin not found in output/"
-assert os.path.exists(h_path), "H.bin not found in output/"
+assert os.path.exists(e_path), "e.bin not found in output/"
+assert os.path.exists(h_path), "h.bin not found in output/"
 
 # Read header:
 with open(e_path, 'rb') as f:
     header = np.fromfile(f, dtype=np.uint64, count=3)
-    assert len(header) == 3, "Invalid header in E.bin"
+    assert len(header) == 3, "Invalid header in e.bin"
 
 nx, ny, nz = int(header[0]), int(header[1]), int(header[2])
 print(f"Grid: {nx} x {ny} x {nz}")
@@ -145,13 +145,13 @@ with open(e_path, 'rb') as fe, open(h_path, 'rb') as fb:
             e_colors = viridis(e_norm[e_mask])
             e_radii = (e_radius_min + (e_radius_max - e_radius_min) * e_norm[e_mask]).astype(np.float32)
 
-            rr.log("world/E_field/volume", rr.Points3D(
+            rr.log("world/e-field/volume", rr.Points3D(
                 positions=vol_positions[e_mask],
                 colors=e_colors,
                 radii=e_radii,
             ))
         else:
-            rr.log("world/E_field/volume", rr.Clear(recursive=False))
+            rr.log("world/e-field/volume", rr.Clear(recursive=False))
 
         # E-Field Vectors:
         e_vx = e_vec[::arrow_step, ::arrow_step, ::arrow_step, 0].ravel()
@@ -171,13 +171,13 @@ with open(e_path, 'rb') as fe, open(h_path, 'rb') as fb:
             e_anorm = e_vmag[e_amask] / e_vec_max
             e_acolors = viridis(e_anorm)
 
-            rr.log("world/E_field/vectors", rr.Arrows3D(
+            rr.log("world/e-field/vectors", rr.Arrows3D(
                 origins=arrow_origins_full[e_amask],
                 vectors=e_vectors,
                 colors=e_acolors,
             ))
         else:
-            rr.log("world/E_field/vectors", rr.Clear(recursive=False))
+            rr.log("world/e-field/vectors", rr.Clear(recursive=False))
 
         # H-Field Volume:
         h_mag_sub = h_mag[::vol_step, ::vol_step, ::vol_step].ravel()
@@ -188,13 +188,13 @@ with open(e_path, 'rb') as fe, open(h_path, 'rb') as fb:
             h_colors = inferno(h_norm[h_mask])
             h_radii = (h_radius_min + (h_radius_max - h_radius_min) * h_norm[h_mask]).astype(np.float32)
 
-            rr.log("world/H_field/volume", rr.Points3D(
+            rr.log("world/h-field/volume", rr.Points3D(
                 positions=vol_positions[h_mask],
                 colors=h_colors,
                 radii=h_radii,
             ))
         else:
-            rr.log("world/H_field/volume", rr.Clear(recursive=False))
+            rr.log("world/h-field/volume", rr.Clear(recursive=False))
 
         # H-field Vectors:
         h_vx = h_vec[::arrow_step, ::arrow_step, ::arrow_step, 0].ravel()
@@ -214,13 +214,13 @@ with open(e_path, 'rb') as fe, open(h_path, 'rb') as fb:
             h_anorm = h_vmag[h_amask] / h_vec_max
             h_acolors = inferno(h_anorm)
 
-            rr.log("world/H_field/vectors", rr.Arrows3D(
+            rr.log("world/h-field/vectors", rr.Arrows3D(
                 origins=arrow_origins_full[h_amask],
                 vectors=h_vectors,
                 colors=h_acolors,
             ))
         else:
-            rr.log("world/H_field/vectors", rr.Clear(recursive=False))
+            rr.log("world/h-field/vectors", rr.Clear(recursive=False))
 
         # Energy Scalars:
         e_total = float(np.sum(e_mag**2))

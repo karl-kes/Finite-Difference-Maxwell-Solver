@@ -1,11 +1,80 @@
-*.exe
+# CMake and Ninja build trees
+/build/
+/build*/
+/build-*/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+install_manifest.txt
+Makefile
+build.ninja
+.ninja_deps
+.ninja_log
+rules.ninja
+Testing/
+_deps/
+
+# Compilation databases and generated toolchain metadata
+compile_commands.json
+CMakeUserPresets.json
+
+# C/C++ and CUDA build products
+*.o
+*.a
+*.so
+*.so.*
+*.d
+*.gch
+*.pch
+*.ptx
+*.cubin
+*.fatbin
+
+# Coverage, profiling, and sanitizer output
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+gmon.out
+perf.data
+perf.data.*
+vgcore.*
+core
+core.*
+
+# Generated simulation and benchmark data
+/output/
+/benchmark/results/
 *.csv
-output
-.vscode
-.venv
-venv
-build
-build_debug
-build_release
-build_test
-benchmark/results
+*.rrd
+
+# Python environments and caches
+/.venv/
+/venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# clangd and editor-local state
+/.cache/clangd/
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example

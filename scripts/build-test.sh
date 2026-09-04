@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
-mkdir -p build_test
-cd build_test
-cmake .. -DCMAKE_BUILD_TYPE=Test
-make -j"$(nproc)" run_tests
+mkdir -p build-test
+cd build-test
+cmake .. -DCMAKE_BUILD_TYPE=Test -DCMAKE_CXX_COMPILER=g++-15
+make -j"$(nproc)" run-tests
 ctest --output-on-failure
